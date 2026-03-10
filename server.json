@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.applitools/applitools",
+  "title": "Applitools",
+  "description": "The Applitools MCP server helps you create, update, and analyze visual tests using Applitools Eyes.",
+  "version": "1.0.0",
+  "websiteUrl": "https://applitools.com",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/applitools/mcp/refs/heads/gh-pages/assets/logo.png",
+      "mimeType": "image/png",
+      "sizes": ["128x128"]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/applitools/mcp.git",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@applitools/mcp",
+      "version": "0.4.2",
+      "runtimeHint": "npx",
+      "runtimeArguments": [
+        { "type": "positional", "value": "-y" },
+        { "type": "positional", "value": "@applitools/mcp" },
+        { "type": "positional", "value": "--ide=public-registry" }
+      ],
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
