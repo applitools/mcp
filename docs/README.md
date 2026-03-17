@@ -25,7 +25,7 @@ All without requiring manual, error-prone steps.
 * Existing Eyes Playwright Fixtures users
   * Who want to use the MCP server to:
     * Add Ultrafast Grid coverage (cross-browser and device testing)
-    * Expand visual checkpoints in existing tests
+    * Quickly convert existing tests into visual tests using Appplitools visual AI
     * Retrieve and analyze your visual test results
 
 ## Requirements & Limitations
@@ -42,15 +42,15 @@ Recommended: VS Code Extension or Cursor MCP Install
 The easiest way to start using Eyes MCP is through the Applitools VS Code extension or by installing the MCP server directly in Cursor.
 
   * Runs the MCP server automatically
-  * Connects it to your AI assistant
+  * Connects it to Copilot or Cursor's AI assistantd
   * Provide context-aware code edits
   * Surface visual test results inside your IDE or MCP client CLI of choice
 
-<a href="https://marketplace.visualstudio.com/items?itemName=applitools-mcp">
+<a href="vscode:extension/applitools.mcp-vscode-extension">
   <img src="https://img.shields.io/badge/Install-VS_Code-007ACC?logo=visualstudiocode&logoColor=white">
 </a>
 
-<a href="cursor://anysphere.cursor-deeplink/mcp/install?name=applitools-mcp&config=eyJjb21tYW5kIjoibnB4IC15IEBhcHBsaXRvb2xzL21jcEBsYXRlc3QifQ">
+<a href="cursor:extension/applitools.mcp-vscode-extension">
   <img src="https://img.shields.io/badge/Install-Cursor-000000">
 </a>
 <br></br>
@@ -84,6 +84,7 @@ Standard MCP configuration:
 
 <details>
   <summary>VS Code</summary>
+
 Please see the [VS Code MCP install guide](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server) and use the standard config above. 
 
 Alternatively, install it via the VS Code CLI:
@@ -116,12 +117,13 @@ Create or edit the configuration file ~/.copilot/mcp-config.json and add:
 <details>
   <summary>Cursor</summary>
 In your user root directory, edit or add the above configuration to your `~/.cursor/mcp.json` file.
-
+<br></br>
 Alternatively, go to Cursor Settings -> MCP -> Add new MCP Server. Name it `applitools-mcp`, use `command` type with the command `npx -y @applitools/mcp@latest`. 
 </details>
 
 <details>
   <summary>Cline</summary>
+
 Follow the instruction in the section [Configuring MCP Servers](https://docs.cline.bot/mcp/configuring-mcp-servers)
 
 Add the following to your `cline_mcp_settings.json` file:
