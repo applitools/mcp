@@ -5,9 +5,62 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.1](https://github.com/applitools/mcp/compare/js/mcp@0.4.0...js/mcp@0.4.1) (2026-03-08)
+## [0.5.0](https://github.com/applitools/mcp/compare/js/mcp@0.4.3...js/mcp@0.5.0) (2026-03-16)
+
+
+### Features
+
+* improve playwright reporter instructions and stale verifications | AD-13006 ([#3667](https://github.com/applitools/mcp/issues/3667)) ([57cc595](https://github.com/applitools/mcp/commit/57cc5953c4ac12d5b92ed6888f1007177924e1ae))
+
 
 ### Bug Fixes
+
+* update mcp readme instructions ([#3663](https://github.com/applitools/mcp/issues/3663)) ([065d433](https://github.com/applitools/mcp/commit/065d4333eddf36a26907e66339f7506db0bd5f59))
+
+
+## [0.4.3](https://github.com/applitools/mcp/compare/js/mcp@0.4.2...js/mcp@0.4.3) (2026-03-12)
+
+### Dependencies
+
+* @applitools/core-base bumped to 1.32.2
+  #### Bug Fixes
+
+## [0.4.2](https://github.com/applitools/mcp/compare/js/mcp@0.4.1...js/mcp@0.4.2) (2026-03-10)
+
+
+### Bug Fixes
+
+* req not found in dist/index file ([#3625](https://github.com/applitools/mcp/issues/3625)) ([9c7d391](https://github.com/applitools/mcp/commit/9c7d3917656690db2186ce6685cefa8fed9fe6bc))
+
+## [0.4.1](https://github.com/applitools/mcp/compare/js/mcp@0.4.0...js/mcp@0.4.1) (2026-03-08)
+
+### Dependencies
+
+* @applitools/utils bumped to 1.14.2
+  
+* @applitools/req bumped to 1.9.1
+  #### Bug Fixes
+
+  * unskip js/mcp ([#3618](https://github.com/applitools/mcp/issues/3618)) ([103f9e2](https://github.com/applitools/mcp/commit/103f9e2f18cddc225aba2f2f59556e5fa38965c0))
+
+
+
+* @applitools/image bumped to 1.2.8
+  #### Bug Fixes
+
+  * unskip js/mcp ([#3618](https://github.com/applitools/mcp/issues/3618)) ([103f9e2](https://github.com/applitools/mcp/commit/103f9e2f18cddc225aba2f2f59556e5fa38965c0))
+
+
+
+* @applitools/core-base bumped to 1.32.1
+  #### Bug Fixes
+
+  * unskip js/mcp ([#3618](https://github.com/applitools/mcp/issues/3618)) ([103f9e2](https://github.com/applitools/mcp/commit/103f9e2f18cddc225aba2f2f59556e5fa38965c0))
+
+
+
+* @applitools/test-server bumped to 1.4.1
+  #### Bug Fixes
 
 * unskip js/mcp ([#3618](https://github.com/applitools/mcp/issues/3618)) ([103f9e2](https://github.com/applitools/mcp/commit/103f9e2f18cddc225aba2f2f59556e5fa38965c0))
 
