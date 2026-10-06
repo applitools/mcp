@@ -3,7 +3,7 @@
   "name": "io.github.applitools/applitools",
   "title": "Applitools",
   "description": "Create, update, review, and resolve visual tests with Applitools Eyes across any supported SDK.",
-  "version": "0.0.0",
+  "version": "1.0.7",
   "websiteUrl": "https://applitools.com",
   "icons": [
     {

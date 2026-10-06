@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Registry versions are a 1.0.N counter because the registry's 1.0.x history outranks npm's 0.x versions.
-# Only server.json is generated here, from the npm tarball; the rest of the repo is static.
-# Local test hooks: NPM_VERSION, REGISTRY_LATEST_JSON, TARBALL, DECIDE_ONLY=1, DRY_RUN=1.
+# Publishes the npm `latest` tarball's server.json verbatim (its versions are set by the package's release process); only server.json is copied here, the rest of the repo is static.
+# Local test hooks: NPM_VERSION, TARBALL, REGISTRY_LATEST_JSON, REGISTRY_VERSION_STATUS, DECIDE_ONLY=1, DRY_RUN=1.
 set -euo pipefail
 
 PACKAGE=${PACKAGE:-@applitools/mcp}
@@ -20,22 +19,28 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-latest_url="$REGISTRY_URL/v0.1/servers/${SERVER_NAME//\//%2F}/versions/latest"
+versions_url="$REGISTRY_URL/v0.1/servers/${SERVER_NAME//\//%2F}/versions"
 
-# Sets $latest_body; any non-200, 404 included, fails the run.
-read_registry_latest() {
-  local resp status
-  if ! resp=$(curl -sS --connect-timeout 20 --max-time 60 -w '\n%{http_code}' "$latest_url"); then
-    fail "registry request to $latest_url failed"
+# Sets $http_status and $http_body; a transport failure fails the run.
+registry_get() {
+  local resp
+  if ! resp=$(curl -sS --connect-timeout 20 --max-time 120 -w '\n%{http_code}' "$versions_url/$1"); then
+    fail "registry request to $versions_url/$1 failed"
   fi
-  status=${resp##*$'\n'}
-  latest_body=${resp%$'\n'*}
-  [[ $status == 200 ]] || fail "registry $latest_url returned HTTP $status"
-  require_json
+  http_status=${resp##*$'\n'}
+  http_body=${resp%$'\n'*}
 }
 
 require_json() {
-  jq -e . >/dev/null 2>&1 <<<"$latest_body" || fail "registry /versions/latest body is not JSON"
+  jq -e . >/dev/null 2>&1 <<<"$1" || fail "registry /versions/$2 body is not JSON"
+}
+
+# Sets $latest_body; any non-200, 404 included, fails the run.
+read_registry_latest() {
+  registry_get latest
+  [[ $http_status == 200 ]] || fail "registry $versions_url/latest returned HTTP $http_status"
+  latest_body=$http_body
+  require_json "$latest_body" latest
 }
 
 if [[ -n ${NPM_VERSION:-} ]]; then
@@ -45,50 +50,6 @@ else
 fi
 [[ $npm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
   || fail "npm latest '$npm_version' of $PACKAGE is not a semver version"
-
-if [[ -n ${REGISTRY_LATEST_JSON:-} ]]; then
-  [[ -f $REGISTRY_LATEST_JSON ]] || fail "REGISTRY_LATEST_JSON file '$REGISTRY_LATEST_JSON' not found"
-  latest_body=$(<"$REGISTRY_LATEST_JSON")
-  require_json
-else
-  read_registry_latest
-fi
-latest_name=$(jq -r '.server.name' <<<"$latest_body")
-latest_identifier=$(jq -r '.server.packages[0].identifier' <<<"$latest_body")
-latest_version=$(jq -r '.server.version' <<<"$latest_body")
-latest_pkg=$(jq -r '.server.packages[0].version' <<<"$latest_body")
-[[ $latest_name == "$SERVER_NAME" && $latest_identifier == "$PACKAGE" ]] \
-  || fail "registry latest is '$latest_name' with package '$latest_identifier', expected '$SERVER_NAME' with '$PACKAGE'"
-# patch+1 of a prerelease or build-metadata version is ambiguous.
-[[ $latest_version =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] \
-  || fail "registry latest '$latest_version' is not plain major.minor.patch"
-major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]} patch=${BASH_REMATCH[3]}
-
-if [[ $latest_pkg == "$npm_version" ]]; then
-  published=1
-  server_version=$latest_version
-else
-  published=0
-  server_version="$major.$minor.$((10#$patch + 1))"
-fi
-
-synced=0
-if [[ -f $repo_root/server.json ]] \
-  && [[ $(jq -r '.packages[0].version' "$repo_root/server.json") == "$npm_version" ]] \
-  && [[ $(jq -r '.version' "$repo_root/server.json") == "$server_version" ]]; then
-  synced=1
-fi
-
-echo "npm_version=$npm_version"
-echo "published=$published"
-echo "server_version=$server_version"
-echo "synced=$synced"
-if [[ $DECIDE_ONLY == 1 ]]; then exit 0; fi
-
-if [[ $published == 1 && $synced == 1 ]]; then
-  notice "$PACKAGE $npm_version is already published as $SERVER_NAME $server_version and this repo is synced"
-  exit 0
-fi
 
 if [[ -n ${TARBALL:-} ]]; then
   tarball=$TARBALL
@@ -108,36 +69,90 @@ member_type=$(tar -tvzf "$tarball" "$member" | head -1 | cut -c1 || true)
 [[ $member_type == - ]] || fail "$member in $PACKAGE@$npm_version is not a regular file (type '$member_type')"
 [[ $count == 1 ]] || fail "$member appears $count times (counting entries under it) in $PACKAGE@$npm_version"
 
-raw="$tmp/server.raw.json"
+manifest="$tmp/server.json"
 set +e
-tar -xzOf "$tarball" "$member" | head -c 65537 >"$raw"
+tar -xzOf "$tarball" "$member" | head -c 65537 >"$manifest"
 read_status=("${PIPESTATUS[@]}")
 set -e
 # Hitting the cap kills tar with SIGPIPE, so the size is checked before the exit statuses.
-(( $(wc -c <"$raw") <= 65536 )) || fail "$member in $PACKAGE@$npm_version is over 64 KiB"
+(( $(wc -c <"$manifest") <= 65536 )) || fail "$member in $PACKAGE@$npm_version is over 64 KiB"
 [[ ${read_status[0]} == 0 && ${read_status[1]} == 0 ]] || fail "cannot read $member from $tarball"
-jq -se 'length == 1 and (.[0] | type) == "object"' "$raw" >/dev/null 2>&1 \
+jq -se 'length == 1 and (.[0] | type) == "object"' "$manifest" >/dev/null 2>&1 \
   || fail "$member in $PACKAGE@$npm_version is not a single JSON object"
 
-tarball_pkg=$(jq -r '.packages[0].version' "$raw")
-[[ $tarball_pkg == "$npm_version" ]] \
-  || fail "tarball server.json packages[0].version is '$tarball_pkg' but npm latest is '$npm_version' — the release PR did not bump server.json (release-please extra-files)"
-
-manifest="$tmp/server.json"
-jq --arg sv "$server_version" '.version = $sv' "$raw" >"$manifest"
 [[ $(jq -r '.name' "$manifest") == "$SERVER_NAME" ]] \
   || fail "server.json name is '$(jq -r '.name' "$manifest")', expected '$SERVER_NAME'"
 [[ $(jq -r '.packages[0].identifier' "$manifest") == "$PACKAGE" ]] \
   || fail "server.json packages[0].identifier is '$(jq -r '.packages[0].identifier' "$manifest")', expected '$PACKAGE'"
+tarball_pkg=$(jq -r '.packages[0].version' "$manifest")
+[[ $tarball_pkg == "$npm_version" ]] \
+  || fail "tarball server.json packages[0].version is '$tarball_pkg' but npm latest is '$npm_version' — the release PR did not bump server.json (release-please extra-files)"
+server_version=$(jq -r '.version' "$manifest")
+[[ $server_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+  || fail "tarball server.json version '$server_version' is not plain major.minor.patch"
+
+if [[ -n ${REGISTRY_LATEST_JSON:-} ]]; then
+  [[ -f $REGISTRY_LATEST_JSON ]] || fail "REGISTRY_LATEST_JSON file '$REGISTRY_LATEST_JSON' not found"
+  latest_body=$(<"$REGISTRY_LATEST_JSON")
+  require_json "$latest_body" latest
+else
+  read_registry_latest
+fi
+latest_name=$(jq -r '.server.name' <<<"$latest_body")
+latest_identifier=$(jq -r '.server.packages[0].identifier' <<<"$latest_body")
+latest_version=$(jq -r '.server.version' <<<"$latest_body")
+[[ $latest_name == "$SERVER_NAME" && $latest_identifier == "$PACKAGE" ]] \
+  || fail "registry latest is '$latest_name' with package '$latest_identifier', expected '$SERVER_NAME' with '$PACKAGE'"
+[[ $latest_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+  || fail "registry latest version '${latest_version//$'\n'/\\n}' is not plain major.minor.patch"
+lowest=$(printf '%s\n%s\n' "$server_version" "$latest_version" | sort -V | head -1)
+if [[ $server_version != "$latest_version" && $lowest == "$server_version" ]]; then
+  fail "server.json version $server_version is not above registry latest $latest_version — the sdk counter is behind; re-sync it (Release-As) before publishing"
+fi
+
+if [[ -n ${REGISTRY_VERSION_STATUS:-} ]]; then
+  http_status=$REGISTRY_VERSION_STATUS
+  http_body=$latest_body
+else
+  registry_get "$server_version"
+fi
+case $http_status in
+  200)
+    published=1
+    require_json "$http_body" "$server_version"
+    taken=$(jq -c '[.server.name, .server.packages[0].identifier, .server.packages[0].version]' <<<"$http_body")
+    ours=$(jq -c '[.name, .packages[0].identifier, .packages[0].version]' "$manifest")
+    [[ $taken == "$ours" ]] \
+      || fail "registry $SERVER_NAME $server_version is already taken by a different publish ($taken, tarball has $ours) — re-sync the sdk counter with a Release-As: footer"
+    ;;
+  404) published=0 ;;
+  *) fail "registry $versions_url/$server_version returned HTTP $http_status" ;;
+esac
+
+synced=0
+if [[ -f $repo_root/server.json ]] && cmp -s "$manifest" "$repo_root/server.json"; then
+  synced=1
+fi
+
+echo "npm_version=$npm_version"
+echo "published=$published"
+echo "server_version=$server_version"
+echo "synced=$synced"
+if [[ $DECIDE_ONLY == 1 ]]; then exit 0; fi
+
+if [[ $published == 1 && $synced == 1 ]]; then
+  notice "$PACKAGE $npm_version is already published as $SERVER_NAME $server_version and this repo is synced"
+  exit 0
+fi
 
 need mcp-publisher
 mcp-publisher validate "$manifest" || fail "mcp-publisher validate rejected the manifest"
 
 if [[ $DRY_RUN == 1 ]]; then
-  echo "--- patched server.json ---"
-  cat "$manifest"
+  echo "--- server.json from the tarball ---"
+  cat "$manifest"; echo
   if [[ $published == 1 ]]; then
-    notice "dry run: $npm_version is already published as $server_version; would not publish"
+    notice "dry run: $SERVER_NAME $server_version is already published; would not publish"
   else
     notice "dry run: would publish $PACKAGE $npm_version as $SERVER_NAME $server_version"
   fi
@@ -159,6 +174,10 @@ fi
 cp "$manifest" "$repo_root/server.json"
 cd "$repo_root"
 git add -- server.json
+if git diff --cached --quiet; then
+  notice "server.json already matches; nothing to commit"
+  exit 0
+fi
 git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
   commit -m "chore: publish $PACKAGE $npm_version to the MCP Registry as $server_version" \
   || fail "git commit failed"
