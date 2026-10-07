@@ -59,26 +59,34 @@ else
   tarball="$tmp/$(tr / - <<<"${PACKAGE#@}")-$npm_version.tgz"
   [[ -f $tarball ]] || fail "npm pack did not produce $tarball"
 fi
-member=package/server.json
 entries=$(tar -tzf "$tarball") || fail "cannot read tarball $tarball"
-count=$(grep -cE '^package/server\.json(/|$)' <<<"$entries" || true)
-[[ $count != 0 ]] \
-  || fail "server.json missing from $PACKAGE@$npm_version — is \"server.json\" in package.json \"files\"?"
-# tar -O reads a symlink/hardlink member as empty and a directory as its children's bytes.
-member_type=$(tar -tvzf "$tarball" "$member" | head -1 | cut -c1 || true)
-[[ $member_type == - ]] || fail "$member in $PACKAGE@$npm_version is not a regular file (type '$member_type')"
-[[ $count == 1 ]] || fail "$member appears $count times (counting entries under it) in $PACKAGE@$npm_version"
+
+# Reads tarball member package/$1 into $2 without unpacking to disk ($3: hint if it is missing); fails
+# unless it is a single regular file of at most 64 KiB holding one JSON object.
+read_member() {
+  local member="package/$1" out=$2 count member_type read_status
+  count=$(grep -cE "^package/${1//./\\.}(/|\$)" <<<"$entries" || true)
+  # A child-only archive (package/<name>/x) has no entry for the member itself; -O would read the child.
+  if [[ $count == 0 ]] || ! grep -qxE "package/${1//./\\.}/?" <<<"$entries"; then
+    fail "$1 missing from $PACKAGE@$npm_version${3:+ — $3}"
+  fi
+  # tar -O reads a symlink/hardlink member as empty and a directory as its children's bytes.
+  member_type=$(tar -tvzf "$tarball" "$member" | head -1 | cut -c1 || true)
+  [[ $member_type == - ]] || fail "$member in $PACKAGE@$npm_version is not a regular file (type '$member_type')"
+  [[ $count == 1 ]] || fail "$member appears $count times (counting entries under it) in $PACKAGE@$npm_version"
+  set +e
+  tar -xzOf "$tarball" "$member" | head -c 65537 >"$out"
+  read_status=("${PIPESTATUS[@]}")
+  set -e
+  # Hitting the cap kills tar with SIGPIPE, so the size is checked before the exit statuses.
+  (( $(wc -c <"$out") <= 65536 )) || fail "$member in $PACKAGE@$npm_version is over 64 KiB"
+  [[ ${read_status[0]} == 0 && ${read_status[1]} == 0 ]] || fail "cannot read $member from $tarball"
+  jq -se 'length == 1 and (.[0] | type) == "object"' "$out" >/dev/null 2>&1 \
+    || fail "$member in $PACKAGE@$npm_version is not a single JSON object"
+}
 
 manifest="$tmp/server.json"
-set +e
-tar -xzOf "$tarball" "$member" | head -c 65537 >"$manifest"
-read_status=("${PIPESTATUS[@]}")
-set -e
-# Hitting the cap kills tar with SIGPIPE, so the size is checked before the exit statuses.
-(( $(wc -c <"$manifest") <= 65536 )) || fail "$member in $PACKAGE@$npm_version is over 64 KiB"
-[[ ${read_status[0]} == 0 && ${read_status[1]} == 0 ]] || fail "cannot read $member from $tarball"
-jq -se 'length == 1 and (.[0] | type) == "object"' "$manifest" >/dev/null 2>&1 \
-  || fail "$member in $PACKAGE@$npm_version is not a single JSON object"
+read_member server.json "$manifest" 'is "server.json" in package.json "files"?'
 
 [[ $(jq -r '.name' "$manifest") == "$SERVER_NAME" ]] \
   || fail "server.json name is '$(jq -r '.name' "$manifest")', expected '$SERVER_NAME'"
@@ -90,6 +98,12 @@ tarball_pkg=$(jq -r '.packages[0].version' "$manifest")
 server_version=$(jq -r '.version' "$manifest")
 [[ $server_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
   || fail "tarball server.json version '$server_version' is not plain major.minor.patch"
+
+package_json="$tmp/package.json"
+read_member package.json "$package_json"
+package_counter=$(jq -r '.mcpRegistryVersion' "$package_json")
+[[ $package_counter == "$server_version" ]] \
+  || fail "tarball package.json mcpRegistryVersion '${package_counter//$'\n'/\\n}' differs from server.json version '$server_version' — the files diverged (hand edit or partial release-PR update)"
 
 if [[ -n ${REGISTRY_LATEST_JSON:-} ]]; then
   [[ -f $REGISTRY_LATEST_JSON ]] || fail "REGISTRY_LATEST_JSON file '$REGISTRY_LATEST_JSON' not found"
@@ -107,7 +121,7 @@ latest_version=$(jq -r '.server.version' <<<"$latest_body")
   || fail "registry latest version '${latest_version//$'\n'/\\n}' is not plain major.minor.patch"
 lowest=$(printf '%s\n%s\n' "$server_version" "$latest_version" | sort -V | head -1)
 if [[ $server_version != "$latest_version" && $lowest == "$server_version" ]]; then
-  fail "server.json version $server_version is not above registry latest $latest_version — the sdk counter is behind; re-sync it (Release-As) before publishing"
+  fail "server.json version $server_version is not above registry latest $latest_version — the source package counter is behind; re-sync mcpRegistryVersion and server.json version before publishing"
 fi
 
 if [[ -n ${REGISTRY_VERSION_STATUS:-} ]]; then
@@ -123,7 +137,7 @@ case $http_status in
     taken=$(jq -c '[.server.name, .server.packages[0].identifier, .server.packages[0].version]' <<<"$http_body")
     ours=$(jq -c '[.name, .packages[0].identifier, .packages[0].version]' "$manifest")
     [[ $taken == "$ours" ]] \
-      || fail "registry $SERVER_NAME $server_version is already taken by a different publish ($taken, tarball has $ours) — re-sync the sdk counter with a Release-As: footer"
+      || fail "registry $SERVER_NAME $server_version is already taken by a different publish ($taken, tarball has $ours) — re-sync mcpRegistryVersion and server.json version in the source package"
     ;;
   404) published=0 ;;
   *) fail "registry $versions_url/$server_version returned HTTP $http_status" ;;
