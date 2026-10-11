@@ -1,15 +1,13 @@
 name: Publish to MCP Registry
 on:
-  schedule:
-    - cron: '17 * * * *'          # off the top of the hour; GitHub drops queued jobs under load
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Compute, validate and show what would change; publish nothing, commit nothing
+        description: Compute, validate and show what would change; publish nothing
         type: boolean
         default: false
 permissions:
-  contents: write                 # commit the published manifest back to main
+  contents: read
   id-token: write                 # mcp-publisher login github-oidc
 concurrency:
   group: publish-mcp-registry

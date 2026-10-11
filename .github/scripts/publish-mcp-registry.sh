@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Publishes the npm `latest` tarball's server.json verbatim (its versions are set by the package's release process); only server.json is copied here, the rest of the repo is static.
-# Local test hooks: NPM_VERSION, TARBALL, REGISTRY_LATEST_JSON, REGISTRY_VERSION_STATUS, DECIDE_ONLY=1, DRY_RUN=1.
+# Publishes the checkout's server.json (synced from the source package's release) to the MCP Registry; package.json in the same checkout is the released version.
+# Local test hooks: REGISTRY_LATEST_JSON, REGISTRY_VERSION_STATUS, DECIDE_ONLY=1, DRY_RUN=1.
 set -euo pipefail
 
 PACKAGE=${PACKAGE:-@applitools/mcp}
@@ -13,11 +13,9 @@ fail() { echo "::error::$*"; exit 1; }
 notice() { echo "::notice::$*"; }
 need() { command -v "$1" >/dev/null || fail "required command '$1' not found"; }
 
-for cmd in jq curl npm tar git; do need "$cmd"; done
+for cmd in jq curl; do need "$cmd"; done
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
 
 versions_url="$REGISTRY_URL/v0.1/servers/${SERVER_NAME//\//%2F}/versions"
 
@@ -43,67 +41,35 @@ read_registry_latest() {
   require_json "$latest_body" latest
 }
 
-if [[ -n ${NPM_VERSION:-} ]]; then
-  npm_version=$NPM_VERSION
-else
-  npm_version=$(npm view "$PACKAGE" dist-tags.latest) || fail "npm view $PACKAGE dist-tags.latest failed"
-fi
-[[ $npm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
-  || fail "npm latest '$npm_version' of $PACKAGE is not a semver version"
-
-if [[ -n ${TARBALL:-} ]]; then
-  tarball=$TARBALL
-else
-  npm pack "$PACKAGE@$npm_version" --pack-destination "$tmp" >/dev/null \
-    || fail "npm pack $PACKAGE@$npm_version failed"
-  tarball="$tmp/$(tr / - <<<"${PACKAGE#@}")-$npm_version.tgz"
-  [[ -f $tarball ]] || fail "npm pack did not produce $tarball"
-fi
-entries=$(tar -tzf "$tarball") || fail "cannot read tarball $tarball"
-
-# Reads tarball member package/$1 into $2 without unpacking to disk ($3: hint if it is missing); fails
-# unless it is a single regular file of at most 64 KiB holding one JSON object.
-read_member() {
-  local member="package/$1" out=$2 count member_type read_status
-  count=$(grep -cE "^package/${1//./\\.}(/|\$)" <<<"$entries" || true)
-  # A child-only archive (package/<name>/x) has no entry for the member itself; -O would read the child.
-  if [[ $count == 0 ]] || ! grep -qxE "package/${1//./\\.}/?" <<<"$entries"; then
-    fail "$1 missing from $PACKAGE@$npm_version${3:+ — $3}"
-  fi
-  # tar -O reads a symlink/hardlink member as empty and a directory as its children's bytes.
-  member_type=$(tar -tvzf "$tarball" "$member" | head -1 | cut -c1 || true)
-  [[ $member_type == - ]] || fail "$member in $PACKAGE@$npm_version is not a regular file (type '$member_type')"
-  [[ $count == 1 ]] || fail "$member appears $count times (counting entries under it) in $PACKAGE@$npm_version"
-  set +e
-  tar -xzOf "$tarball" "$member" | head -c 65537 >"$out"
-  read_status=("${PIPESTATUS[@]}")
-  set -e
-  # Hitting the cap kills tar with SIGPIPE, so the size is checked before the exit statuses.
-  (( $(wc -c <"$out") <= 65536 )) || fail "$member in $PACKAGE@$npm_version is over 64 KiB"
-  [[ ${read_status[0]} == 0 && ${read_status[1]} == 0 ]] || fail "cannot read $member from $tarball"
-  jq -se 'length == 1 and (.[0] | type) == "object"' "$out" >/dev/null 2>&1 \
-    || fail "$member in $PACKAGE@$npm_version is not a single JSON object"
+# Fails unless $1 is a regular file of at most 64 KiB holding one JSON object.
+check_json_file() {
+  [[ -f $1 && ! -L $1 ]] || fail "$1 is missing or not a regular file"
+  (( $(wc -c <"$1") <= 65536 )) || fail "$1 is over 64 KiB"
+  jq -se 'length == 1 and (.[0] | type) == "object"' "$1" >/dev/null 2>&1 \
+    || fail "$1 is not a single JSON object"
 }
 
-manifest="$tmp/server.json"
-read_member server.json "$manifest" 'is "server.json" in package.json "files"?'
+manifest="$repo_root/server.json"
+package_json="$repo_root/package.json"
+check_json_file "$manifest"
+check_json_file "$package_json"
 
 [[ $(jq -r '.name' "$manifest") == "$SERVER_NAME" ]] \
   || fail "server.json name is '$(jq -r '.name' "$manifest")', expected '$SERVER_NAME'"
 [[ $(jq -r '.packages[0].identifier' "$manifest") == "$PACKAGE" ]] \
   || fail "server.json packages[0].identifier is '$(jq -r '.packages[0].identifier' "$manifest")', expected '$PACKAGE'"
-tarball_pkg=$(jq -r '.packages[0].version' "$manifest")
-[[ $tarball_pkg == "$npm_version" ]] \
-  || fail "tarball server.json packages[0].version is '$tarball_pkg' but npm latest is '$npm_version' — the release PR did not bump server.json (release-please extra-files)"
+npm_version=$(jq -r '.version' "$package_json")
+[[ $npm_version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+  || fail "package.json version '$npm_version' is not a semver version"
+manifest_pkg=$(jq -r '.packages[0].version' "$manifest")
+[[ $manifest_pkg == "$npm_version" ]] \
+  || fail "server.json packages[0].version is '$manifest_pkg' but package.json version is '$npm_version' — the release PR did not bump server.json (release-please extra-files)"
 server_version=$(jq -r '.version' "$manifest")
 [[ $server_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-  || fail "tarball server.json version '$server_version' is not plain major.minor.patch"
-
-package_json="$tmp/package.json"
-read_member package.json "$package_json"
+  || fail "server.json version '$server_version' is not plain major.minor.patch"
 package_counter=$(jq -r '.mcpRegistryVersion' "$package_json")
 [[ $package_counter == "$server_version" ]] \
-  || fail "tarball package.json mcpRegistryVersion '${package_counter//$'\n'/\\n}' differs from server.json version '$server_version' — the files diverged (hand edit or partial release-PR update)"
+  || fail "package.json mcpRegistryVersion '${package_counter//$'\n'/\\n}' differs from server.json version '$server_version' — the files diverged (hand edit or partial release-PR update)"
 
 if [[ -n ${REGISTRY_LATEST_JSON:-} ]]; then
   [[ -f $REGISTRY_LATEST_JSON ]] || fail "REGISTRY_LATEST_JSON file '$REGISTRY_LATEST_JSON' not found"
@@ -137,25 +103,19 @@ case $http_status in
     taken=$(jq -c '[.server.name, .server.packages[0].identifier, .server.packages[0].version]' <<<"$http_body")
     ours=$(jq -c '[.name, .packages[0].identifier, .packages[0].version]' "$manifest")
     [[ $taken == "$ours" ]] \
-      || fail "registry $SERVER_NAME $server_version is already taken by a different publish ($taken, tarball has $ours) — re-sync mcpRegistryVersion and server.json version in the source package"
+      || fail "registry $SERVER_NAME $server_version is already taken by a different publish ($taken, checkout has $ours) — re-sync mcpRegistryVersion and server.json version in the source package"
     ;;
   404) published=0 ;;
   *) fail "registry $versions_url/$server_version returned HTTP $http_status" ;;
 esac
 
-synced=0
-if [[ -f $repo_root/server.json ]] && cmp -s "$manifest" "$repo_root/server.json"; then
-  synced=1
-fi
-
 echo "npm_version=$npm_version"
 echo "published=$published"
 echo "server_version=$server_version"
-echo "synced=$synced"
 if [[ $DECIDE_ONLY == 1 ]]; then exit 0; fi
 
-if [[ $published == 1 && $synced == 1 ]]; then
-  notice "$PACKAGE $npm_version is already published as $SERVER_NAME $server_version and this repo is synced"
+if [[ $published == 1 ]]; then
+  notice "$PACKAGE $npm_version is already published as $SERVER_NAME $server_version"
   exit 0
 fi
 
@@ -163,37 +123,16 @@ need mcp-publisher
 mcp-publisher validate "$manifest" || fail "mcp-publisher validate rejected the manifest"
 
 if [[ $DRY_RUN == 1 ]]; then
-  echo "--- server.json from the tarball ---"
+  echo "--- server.json ---"
   cat "$manifest"; echo
-  if [[ $published == 1 ]]; then
-    notice "dry run: $SERVER_NAME $server_version is already published; would not publish"
-  else
-    notice "dry run: would publish $PACKAGE $npm_version as $SERVER_NAME $server_version"
-  fi
-  echo "--- server.json change the commit-back would make ---"
-  diff -u "$repo_root/server.json" "$manifest" || true
+  notice "dry run: would publish $PACKAGE $npm_version as $SERVER_NAME $server_version"
   exit 0
 fi
 
-if [[ $published == 0 ]]; then
-  mcp-publisher login github-oidc --registry "$REGISTRY_URL" || fail "mcp-publisher login github-oidc failed"
-  mcp-publisher publish "$manifest" || fail "mcp-publisher publish failed"
-  read_registry_latest
-  got=$(jq -c '{version: .server.version, package: .server.packages[0].version, isLatest: ._meta["io.modelcontextprotocol.registry/official"].isLatest}' <<<"$latest_body")
-  want=$(jq -nc --arg sv "$server_version" --arg nv "$npm_version" '{version: $sv, package: $nv, isLatest: true}')
-  [[ $got == "$want" ]] || fail "after publish, registry latest is $got, expected $want"
-  notice "published $PACKAGE $npm_version as $SERVER_NAME $server_version"
-fi
-
-cp "$manifest" "$repo_root/server.json"
-cd "$repo_root"
-git add -- server.json
-if git diff --cached --quiet; then
-  notice "server.json already matches; nothing to commit"
-  exit 0
-fi
-git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-  commit -m "chore: publish $PACKAGE $npm_version to the MCP Registry as $server_version" \
-  || fail "git commit failed"
-git push || fail "git push failed; the next run will retry the commit-back"
-notice "committed server.json for $PACKAGE $npm_version as $server_version"
+mcp-publisher login github-oidc --registry "$REGISTRY_URL" || fail "mcp-publisher login github-oidc failed"
+mcp-publisher publish "$manifest" || fail "mcp-publisher publish failed"
+read_registry_latest
+got=$(jq -c '{version: .server.version, package: .server.packages[0].version, isLatest: ._meta["io.modelcontextprotocol.registry/official"].isLatest}' <<<"$latest_body")
+want=$(jq -nc --arg sv "$server_version" --arg nv "$npm_version" '{version: $sv, package: $nv, isLatest: true}')
+[[ $got == "$want" ]] || fail "after publish, registry latest is $got, expected $want"
+notice "published $PACKAGE $npm_version as $SERVER_NAME $server_version"

@@ -1,0 +1,66 @@
+{
+  "name": "@applitools/mcp",
+  "mcpName": "io.github.applitools/applitools",
+  "version": "0.5.0",
+  "description": "Applitools MCP server for AI coding assistants",
+  "main": "./dist/index.js",
+  "bin": "./dist/index.js",
+  "keywords": [
+    "applitools",
+    "eyes",
+    "mcp",
+    "model-context-protocol",
+    "playwright",
+    "visual-testing",
+    "ai",
+    "coding-assistant",
+    "visual regression",
+    "model context protocol",
+    "ui testing",
+    "cross-browser testing",
+    "ultrafast grid",
+    "test automation"
+  ],
+  "icon": "src/assets/logo.png",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": {
+    "name": "Applitools Team",
+    "email": "team@applitools.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/applitools/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/applitools/mcp/issues"
+  },
+  "homepage": "https://applitools.com",
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@applitools/core-base": "1.32.3",
+    "@applitools/logger": "2.2.9",
+    "@applitools/req": "1.9.1",
+    "@applitools/utils": "1.14.2",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^5.2.1",
+    "zod": "^4.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "lavamoat": {
+    "allowScripts": {
+      "@applitools/core-base>@applitools/image>sharp": false
+    }
+  }
+}
