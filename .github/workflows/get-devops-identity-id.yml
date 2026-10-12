@@ -1,0 +1,21 @@
+name: Get DevOps Identity ID
+on: workflow_dispatch # Allows you to run it manually from the UI
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  fetch-id:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Fetch and Print DevOps ID
+        run: |
+          az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me --resource 499b84ac-1321-427f-aa17-267ca6975798
