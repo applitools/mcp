@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Publishes the checkout's server.json (synced from the source package's release) to the MCP Registry; package.json in the same checkout is the released version.
-# Local test hooks: REGISTRY_LATEST_JSON, REGISTRY_VERSION_STATUS, DECIDE_ONLY=1, DRY_RUN=1.
+# Local test hooks: REGISTRY_LATEST_JSON, REGISTRY_VERSION_STATUS, DECIDE_ONLY=1, DRY_RUN (anything but false is a dry run).
 set -euo pipefail
 
 PACKAGE=${PACKAGE:-@applitools/mcp}
 SERVER_NAME=${SERVER_NAME:-io.github.applitools/applitools}
 REGISTRY_URL=${REGISTRY_URL:-https://registry.modelcontextprotocol.io}
-DRY_RUN=${DRY_RUN:-0}
+DRY_RUN=${DRY_RUN:-true}
 DECIDE_ONLY=${DECIDE_ONLY:-0}
 
 fail() { echo "::error::$*"; exit 1; }
@@ -47,6 +47,24 @@ check_json_file() {
   (( $(wc -c <"$1") <= 65536 )) || fail "$1 is over 64 KiB"
   jq -se 'length == 1 and (.[0] | type) == "object"' "$1" >/dev/null 2>&1 \
     || fail "$1 is not a single JSON object"
+}
+
+# Fails unless the registry token from `mcp-publisher login` grants publish on $SERVER_NAME (pattern match as in the registry's isResourceMatch).
+check_publish_permission() {
+  local token_file=$HOME/.config/mcp-publisher/token.json payload claims
+  [[ -f $token_file ]] || fail "mcp-publisher login left no token at $token_file"
+  payload=$(jq -r '(.token? // "") | tostring | split(".")[1] // ""' "$token_file" 2>/dev/null) || payload=
+  payload=${payload//-/+}; payload=${payload//_//}
+  while (( ${#payload} % 4 )); do payload+='='; done
+  claims=$(base64 -d <<<"$payload" 2>/dev/null) || claims=
+  # -n + input: jq 1.6 exits 0 on empty stdin even with -e.
+  jq -ne 'input | type == "object"' >/dev/null 2>&1 <<<"$claims" \
+    || fail "registry token in $token_file is not a decodable JWT"
+  notice "registry token: $(jq -c '{auth_method, auth_method_sub, permissions}' <<<"$claims")"
+  jq -e --arg r "$SERVER_NAME" '[.permissions[]? | select(.action == "publish") | .resource as $p
+      | select($p == "*" or $p == $r or ($p | endswith("*")) and ($r | startswith($p[:-1])))] | length > 0' \
+      <<<"$claims" >/dev/null \
+    || fail "registry token does not grant publish on $SERVER_NAME"
 }
 
 manifest="$repo_root/server.json"
@@ -114,22 +132,27 @@ echo "published=$published"
 echo "server_version=$server_version"
 if [[ $DECIDE_ONLY == 1 ]]; then exit 0; fi
 
-if [[ $published == 1 ]]; then
+if [[ $published == 1 && $DRY_RUN == false ]]; then
   notice "$PACKAGE $npm_version is already published as $SERVER_NAME $server_version"
   exit 0
 fi
 
 need mcp-publisher
 mcp-publisher validate "$manifest" || fail "mcp-publisher validate rejected the manifest"
+mcp-publisher login github-oidc --registry "$REGISTRY_URL" || fail "mcp-publisher login github-oidc failed"
 
-if [[ $DRY_RUN == 1 ]]; then
+if [[ $DRY_RUN != false ]]; then
+  check_publish_permission
   echo "--- server.json ---"
   cat "$manifest"; echo
-  notice "dry run: would publish $PACKAGE $npm_version as $SERVER_NAME $server_version"
+  if [[ $published == 1 ]]; then
+    notice "dry run: $PACKAGE $npm_version is already published as $SERVER_NAME $server_version; a real run would exit without publishing"
+  else
+    notice "dry run: would publish $PACKAGE $npm_version as $SERVER_NAME $server_version"
+  fi
   exit 0
 fi
 
-mcp-publisher login github-oidc --registry "$REGISTRY_URL" || fail "mcp-publisher login github-oidc failed"
 mcp-publisher publish "$manifest" || fail "mcp-publisher publish failed"
 read_registry_latest
 got=$(jq -c '{version: .server.version, package: .server.packages[0].version, isLatest: ._meta["io.modelcontextprotocol.registry/official"].isLatest}' <<<"$latest_body")

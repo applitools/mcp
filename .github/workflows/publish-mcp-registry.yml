@@ -2,8 +2,8 @@ name: Publish to MCP Registry
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: Compute, validate and show what would change; publish nothing
+      dry-run:
+        description: Go through the motions without publishing (OIDC login and every registry read still run)
         type: boolean
         default: false
 permissions:
@@ -27,4 +27,4 @@ jobs:
           tar xzf mcp-publisher.tgz mcp-publisher && sudo mv mcp-publisher /usr/local/bin/
       - run: .github/scripts/publish-mcp-registry.sh
         env:
-          DRY_RUN: ${{ inputs.dry_run == true && '1' || '0' }}
+          DRY_RUN: ${{ inputs.dry-run }}
