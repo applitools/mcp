@@ -23,7 +23,7 @@
     {
       "registryType": "npm",
       "identifier": "@applitools/mcp",
-      "version": "0.4.3",
+      "version": "0.5.0",
       "runtimeHint": "npx",
       "runtimeArguments": [
         {
@@ -64,9 +64,9 @@
         "preferredImage": "https://raw.githubusercontent.com/applitools/mcp/main/assets/logo.png",
         "primaryLanguage": "TypeScript",
         "primaryLanguageColor": "#3178c6",
-        "pushedAt": "2026-03-15T00:00:00Z",
+        "pushedAt": "2026-03-16T00:00:00Z",
         "readme": "# Applitools MCP Server\n\nThe Applitools MCP server helps you create, update, and analyze visual tests using Applitools Eyes with our Playwright (JavaScript/TypeScript) Fixtures SDK, with support for more frameworks coming soon.\n\nIt connects to AI assistants through the Model Context Protocol (MCP), allowing tools like Cline, Claude Code, and IDE assistants to help you set up tests, add visual checkpoints, and configure cross-browser testing.\n\nTo learn more, please visit our MCP documentation.",
-        "readmeUpdatedAt": "2026-03-15T00:00:00Z",
+        "readmeUpdatedAt": "2026-03-16T00:00:00Z",
         "readmeVersion": "0.0.1",
         "stargazerCount": 0,
         "topics": [
