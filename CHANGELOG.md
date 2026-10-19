@@ -5,6 +5,13 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.9](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.8.8...js/mcp@0.8.9) (2026-10-19)
+
+
+### Bug Fixes
+
+* keep server.json registry versions current on each release | AD-16802 ([#4266](https://github.com/Applitools-Dev/sdk/issues/4266)) ([e61650e](https://github.com/Applitools-Dev/sdk/commit/e61650e6bfe06bf90380a7d1cd832a88740fbdfd))
+
 ## [0.8.8](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.8.7...js/mcp@0.8.8) (2026-10-18)
 
 

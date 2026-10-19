@@ -4499,7 +4499,8 @@ function gateRejectionCount() {
 
 var name = "@applitools/mcp";
 var mcpName = "io.github.applitools/applitools";
-var version = "0.8.8";
+var mcpRegistryVersion = "1.0.8";
+var version = "0.8.9";
 var description = "Applitools MCP server for AI coding assistants";
 var main = "./dist/index.js";
 var bin = "./dist/index.js";
@@ -4600,6 +4601,7 @@ var lavamoat = {
 var packageJson = {
 	name: name,
 	mcpName: mcpName,
+	mcpRegistryVersion: mcpRegistryVersion,
 	version: version,
 	description: description,
 	main: main,
