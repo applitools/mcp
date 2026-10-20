@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Extension version; the .vsix is the asset of release mcp-vscode-extension@<version> on this repo
+        description: Extension version; the .vsix is read from the sdk release's public Azure storage
         required: true
         type: string
       dry-run:
@@ -27,10 +27,9 @@ jobs:
       VSIX: mcp-vscode-extension-${{ inputs.version }}.vsix
     steps:
       - name: Download .vsix
-        run: gh release download "mcp-vscode-extension@$VERSION" -R "$GITHUB_REPOSITORY" --pattern "$VSIX"
+        run: curl -fsSL --retry 3 -o "$VSIX" "https://sdksstorage.blob.core.windows.net/releases/mcp-vscode-extension/$VERSION/$VSIX"
         env:
           VERSION: ${{ inputs.version }}
-          GH_TOKEN: ${{ github.token }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
