@@ -21,6 +21,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # pinned by the Open VSX trusted publisher; the token's environment claim must match
+    environment: mcp-extension
     env:
       VSIX: mcp-vscode-extension-${{ inputs.version }}.vsix
     steps:
