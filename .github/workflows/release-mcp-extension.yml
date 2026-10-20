@@ -1,0 +1,39 @@
+name: Publish VS Code extension to Open VSX
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Extension version; the .vsix is the asset of release mcp-vscode-extension@<version> on this repo
+        required: true
+        type: string
+      dry-run:
+        description: Download and check the .vsix without publishing
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  id-token: write                 # ovsx --trusted-publishing
+concurrency:
+  group: release-mcp-extension
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VSIX: mcp-vscode-extension-${{ inputs.version }}.vsix
+    steps:
+      - name: Download .vsix
+        run: gh release download "mcp-vscode-extension@$VERSION" -R "$GITHUB_REPOSITORY" --pattern "$VSIX"
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Publish to Open VSX
+        if: ${{ !inputs.dry-run }}
+        run: npx --yes ovsx@1.2.0 publish "$VSIX" --trusted-publishing --skip-duplicate
+        env:
+          npm_config_ignore_scripts: true
