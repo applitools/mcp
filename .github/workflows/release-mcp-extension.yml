@@ -1,1 +1,40 @@
-name: Release-mcp-extension
+name: Publish VS Code extension to Open VSX
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Extension version; the .vsix is read from the sdk release's public Azure storage
+        required: true
+        type: string
+      dry-run:
+        description: Download and check the .vsix without publishing
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  id-token: write                 # ovsx --trusted-publishing
+concurrency:
+  group: release-mcp-extension
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # pinned by the Open VSX trusted publisher; the token's environment claim must match
+    environment: mcp-extension
+    env:
+      VSIX: mcp-vscode-extension-${{ inputs.version }}.vsix
+    steps:
+      - name: Download .vsix
+        run: curl -fsSL --retry 3 -o "$VSIX" "https://sdksstorage.blob.core.windows.net/releases/mcp-vscode-extension/$VERSION/$VSIX"
+        env:
+          VERSION: ${{ inputs.version }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Publish to Open VSX
+        if: ${{ !inputs.dry-run }}
+        run: npx --yes ovsx@1.2.0 publish "$VSIX" --trusted-publishing --skip-duplicate
+        env:
+          npm_config_ignore_scripts: true
