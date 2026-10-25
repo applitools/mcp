@@ -1,8 +1,8 @@
 {
   "name": "@applitools/mcp",
   "mcpName": "io.github.applitools/applitools",
-  "mcpRegistryVersion": "1.0.8",
-  "version": "0.8.9",
+  "mcpRegistryVersion": "1.0.9",
+  "version": "0.9.0",
   "description": "Applitools MCP server for AI coding assistants",
   "main": "./dist/index.js",
   "bin": "./dist/index.js",

@@ -5,6 +5,13 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.8.9...js/mcp@0.9.0) (2026-10-25)
+
+
+### Features
+
+* update iOS device names for the iOS 27 UFG upgrade | AD-17131 ([#4354](https://github.com/Applitools-Dev/sdk/issues/4354)) ([d825238](https://github.com/Applitools-Dev/sdk/commit/d8252386c111cbf4612c6ea559eecbef0b133fcf))
+
 ## [0.8.9](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.8.8...js/mcp@0.8.9) (2026-10-19)
 
 

@@ -4499,8 +4499,8 @@ function gateRejectionCount() {
 
 var name = "@applitools/mcp";
 var mcpName = "io.github.applitools/applitools";
-var mcpRegistryVersion = "1.0.8";
-var version = "0.8.9";
+var mcpRegistryVersion = "1.0.9";
+var version = "0.9.0";
 var description = "Applitools MCP server for AI coding assistants";
 var main = "./dist/index.js";
 var bin = "./dist/index.js";
@@ -5568,7 +5568,7 @@ IMPORTANT: For initial setup of UFG don't deviate from the above configuration u
 
 Safari browsers on iOS devices can be added to "browsersInfo" in the following format:
 
-{ iosDeviceInfo: {deviceName: 'iPad (7th generation)'} }
+{ iosDeviceInfo: {deviceName: 'iPad (10th generation)'} }
 
 Chrome emulation on various Android devices can be added to "browsersInfo" as follows:
 
