@@ -5,6 +5,20 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.9.1...js/mcp@0.9.2) (2026-10-29)
+
+
+### Dependencies
+
+* @applitools/eyes-results bumped to 0.2.7
+
+* @applitools/req bumped to 1.11.6
+  #### Bug Fixes
+
+  * send a stream request body without cloning it ([#4368](https://github.com/Applitools-Dev/sdk/issues/4368)) ([ebfc31e](https://github.com/Applitools-Dev/sdk/commit/ebfc31e269d09ee49dcdda9a860a7c47c55f387a))
+* @applitools/core-base bumped to 1.41.3
+
+
 ## [0.9.1](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.9.0...js/mcp@0.9.1) (2026-10-26)
 
 
