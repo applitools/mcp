@@ -4499,8 +4499,8 @@ function gateRejectionCount() {
 
 var name = "@applitools/mcp";
 var mcpName = "io.github.applitools/applitools";
-var mcpRegistryVersion = "1.0.14";
-var version = "0.10.2";
+var mcpRegistryVersion = "1.0.15";
+var version = "0.10.3";
 var description = "Applitools MCP server for AI coding assistants";
 var main = "./dist/index.js";
 var bin = "./dist/index.js";

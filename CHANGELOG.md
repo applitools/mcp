@@ -5,6 +5,21 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.3](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.2...js/mcp@0.10.3) (2026-11-05)
+
+
+### Dependencies
+
+* @applitools/core-base bumped to 1.42.0
+  #### Features
+
+  * run the Eyes session lifecycle on the task graph | AD-16964 ([#4361](https://github.com/Applitools-Dev/sdk/issues/4361)) ([51eb00f](https://github.com/Applitools-Dev/sdk/commit/51eb00f60f5e95a91689f170192b4d7d580437af))
+
+
+  #### Code Refactoring
+
+  * split deps from after, typed labels, filler awaits | AD-16964 ([#4362](https://github.com/Applitools-Dev/sdk/issues/4362)) ([6aaf46b](https://github.com/Applitools-Dev/sdk/commit/6aaf46be75059911917c8c31e8e008126cea2c5a))
+
 ## [0.10.2](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.1...js/mcp@0.10.2) (2026-11-04)
 
 
