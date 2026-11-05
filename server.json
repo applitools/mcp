@@ -3,7 +3,7 @@
   "name": "io.github.applitools/applitools",
   "title": "Applitools",
   "description": "Create, update, review, and resolve visual tests with Applitools Eyes across any supported SDK.",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "websiteUrl": "https://applitools.com",
   "icons": [
     {
@@ -23,7 +23,7 @@
     {
       "registryType": "npm",
       "identifier": "@applitools/mcp",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "runtimeHint": "npx",
       "runtimeArguments": [
         {

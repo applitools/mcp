@@ -5,6 +5,26 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.2](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.1...js/mcp@0.10.2) (2026-11-04)
+
+
+### Dependencies
+
+* @applitools/eyes-results bumped to 0.2.8
+
+* @applitools/logger bumped to 2.3.3
+  #### Bug Fixes
+
+  * ignore empty and non-string mask values | AD-17629 ([#4403](https://github.com/Applitools-Dev/sdk/issues/4403)) ([01cdbf1](https://github.com/Applitools-Dev/sdk/commit/01cdbf15f562044636783401e341bda581927589))
+* @applitools/req bumped to 1.11.7
+
+* @applitools/image bumped to 1.3.5
+
+* @applitools/core-base bumped to 1.41.5
+
+* @applitools/test-server bumped to 1.4.9
+
+
 ## [0.10.1](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.0...js/mcp@0.10.1) (2026-11-02)
 
 
