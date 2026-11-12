@@ -4499,8 +4499,8 @@ function gateRejectionCount() {
 
 var name = "@applitools/mcp";
 var mcpName = "io.github.applitools/applitools";
-var mcpRegistryVersion = "1.0.15";
-var version = "0.10.3";
+var mcpRegistryVersion = "1.0.16";
+var version = "0.10.4";
 var description = "Applitools MCP server for AI coding assistants";
 var main = "./dist/index.js";
 var bin = "./dist/index.js";
@@ -4558,7 +4558,7 @@ var dependencies = {
 	"@applitools/logger": "workspace:*",
 	"@applitools/req": "workspace:*",
 	"@applitools/utils": "workspace:*",
-	"@modelcontextprotocol/sdk": "^1.0.0",
+	"@modelcontextprotocol/sdk": "^1.32.0",
 	dotenv: "^16.3.1",
 	zod: "^4.0.0"
 };
@@ -4576,10 +4576,10 @@ var devDependencies = {
 	"eslint-config-prettier": "^10.1.8",
 	"eslint-plugin-prettier": "^5.5.4",
 	"fast-glob": "^3.3.2",
-	hono: "^4.0.0",
+	hono: "^4.12.25",
 	mocha: "^11.7.5",
 	prettier: "^3.7.4",
-	rollup: "^4.9.6",
+	rollup: "^4.59.0",
 	"rollup-plugin-copy": "^3.5.0",
 	"rollup-plugin-node-externals": "^8.1.2",
 	typescript: "~5.9.3",
@@ -8805,7 +8805,9 @@ const SummaryExampleShape = zod.z.array(SummaryExampleFindingShape).superRefine(
  * reaches `commands.ts` is stripped to exactly one shape, as it was when each level had its own tool.
  */
 const ReviewEndFindingsShape = zod.z
-    .union([zod.z.array(StepEndFindingShape.loose()), zod.z.array(SummaryExampleFindingShape.loose())])
+    .union([zod.z.array(StepEndFindingShape.loose()), zod.z.array(SummaryExampleFindingShape.loose())], {
+    error: issue => (issue.code === 'invalid_union' ? issue.errors.map(formatIssues).join(' | or | ') : undefined),
+})
     .describe('Which shape this takes depends on scope: "step" takes one consolidated summary per changed area (areaRect, ' +
     'summary, consistent, dynamic, isExpected/isBug, sources); "batch"/"scenario"/"session" take one summary per ' +
     "finding with its own example link (summary, example, isExpected/isBug, sources). See each field's own " +
@@ -8820,6 +8822,19 @@ const JsonFileArgShape = zod.z
     'large enough to risk the response not finishing before its JSON closes (e.g. many entries, or many that share ' +
     'one repetitive cause such as one locale/theme change touching every changed area alike) — writing to a file has ' +
     'no such limit. The tool reads and validates the file exactly as if its contents had been sent inline.');
+// The MCP SDK reports a failed union by its own message alone ("Invalid input"), so these unions
+// spell out what their branches rejected — otherwise the model never learns which field was wrong.
+function formatIssues(issues) {
+    return issues
+        .map(issue => (issue.path.length ? `${issue.path.join('.')}: ${issue.message}` : issue.message))
+        .join('; ');
+}
+/** An array argument that may instead be sent as a file path (JsonFileArgShape); a rejection reports the inline array's issues. */
+function inlineOrFilePath(inline) {
+    return zod.z.union([inline, JsonFileArgShape], {
+        error: issue => (issue.code === 'invalid_union' ? formatIssues(issue.errors[0]) : undefined),
+    });
+}
 
 /**
  * Build the canonical Eyes dashboard URL for a single test session.
@@ -11265,7 +11280,7 @@ function registerReviewTools(server, deps = defaultPhaseTrackerDeps) {
         inputSchema: {
             scope: EndScopeShape,
             ...REVIEW_SCOPE_ID_SHAPES,
-            findings: zod.z.union([ReviewEndFindingsShape, JsonFileArgShape]),
+            findings: inlineOrFilePath(ReviewEndFindingsShape),
             rootScope: RootScopeShape,
             mode: ModeShape,
             restart: RestartShape,
@@ -11326,7 +11341,7 @@ function registerReviewTools(server, deps = defaultPhaseTrackerDeps) {
         inputSchema: {
             sessionUrl: zod.z.string().describe(SESSION_URL_DESC),
             stepIndex: zod.z.number().int().nonnegative().describe(STEP_INDEX_DESC),
-            reports: zod.z.union([DiffReportsShape, JsonFileArgShape]),
+            reports: inlineOrFilePath(DiffReportsShape),
             rootScope: RootScopeShape,
             mode: ModeShape,
             restart: RestartShape,

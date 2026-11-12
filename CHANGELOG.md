@@ -5,6 +5,47 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.4](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.3...js/mcp@0.10.4) (2026-11-11)
+
+
+### Dependencies
+
+* @applitools/utils bumped to 1.15.4
+
+* @applitools/eyes-results bumped to 0.2.9
+
+* @applitools/logger bumped to 2.3.4
+
+* @applitools/req bumped to 1.11.8
+  #### Bug Fixes
+
+  * give each request its own retry budget and bound Retry-After ([#4418](https://github.com/Applitools-Dev/sdk/issues/4418)) ([9acdcfb](https://github.com/Applitools-Dev/sdk/commit/9acdcfb921729e796a49f5a1129911fa4eb19fce))
+
+
+
+* @applitools/image bumped to 1.3.6
+
+* @applitools/core-base bumped to 1.43.0
+  #### Features
+
+  * log DOM size and upload time | AD-17825 ([#4432](https://github.com/Applitools-Dev/sdk/issues/4432)) ([8b5c224](https://github.com/Applitools-Dev/sdk/commit/8b5c22492f3783c7ce26769bf084bfe794e770e9))
+  * pdf conversion client and visual match | AD-15596 ([#4132](https://github.com/Applitools-Dev/sdk/issues/4132)) ([d05f600](https://github.com/Applitools-Dev/sdk/commit/d05f60051145f1d447296caa35d56996e25cdbd1))
+
+
+  #### Bug Fixes
+
+  * send the serviceUrlNew check and its log events through the configured proxy | FLD-5197 ([#4453](https://github.com/Applitools-Dev/sdk/issues/4453)) ([fe2bb46](https://github.com/Applitools-Dev/sdk/commit/fe2bb462e644c62b685fb35e60c06f978eacc439))
+
+
+  #### Code Refactoring
+
+  * spread the optional httpVersion with && in requests ([#4462](https://github.com/Applitools-Dev/sdk/issues/4462)) ([c3a144e](https://github.com/Applitools-Dev/sdk/commit/c3a144e97f48968c23b781b7e11ebb3ec8b3b7ab))
+
+
+
+* @applitools/test-server bumped to 1.4.10
+
+
 ## [0.10.3](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.2...js/mcp@0.10.3) (2026-11-05)
 
 
