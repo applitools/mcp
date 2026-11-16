@@ -192,6 +192,10 @@ APPLITOOLS_READ_KEY=<your read-only key>
 APPLITOOLS_WRITE_KEY=<your write-only key>
 ```
 
+`APPLITOOLS_READ_KEY` and `APPLITOOLS_WRITE_KEY` set in your project's `.env` take precedence over the same variables in your `mcp.json` configuration. `APPLITOOLS_API_KEY` and `APPLITOOLS_SERVER_URL` set in your `mcp.json` configuration stay in use for the whole session. The server reads only `APPLITOOLS_API_KEY`, `APPLITOOLS_READ_KEY`, `APPLITOOLS_WRITE_KEY` and `APPLITOOLS_SERVER_URL` from a `.env`, taken from the nearest `.env` at or above your project directory that sets any of them.
+
+Keys are sent only over `https` to `applitools.com` and its subdomains. A server URL or Eyes dashboard URL on any other host is refused.
+
 ## Available Tools
 
 ### Setup & Configuration

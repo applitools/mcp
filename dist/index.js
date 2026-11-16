@@ -8,8 +8,8 @@ var promises = require('node:fs/promises');
 var path = require('node:path');
 var logger$1 = require('@applitools/logger');
 var coreBase = require('@applitools/core-base');
-var fs = require('node:fs');
 var dotenv = require('dotenv');
+var fs = require('node:fs');
 var os = require('node:os');
 var crypto = require('node:crypto');
 var req = require('@applitools/req');
@@ -38,8 +38,8 @@ function _interopNamespaceDefault(e) {
 }
 
 var path__namespace = /*#__PURE__*/_interopNamespaceDefault(path);
-var fs__namespace = /*#__PURE__*/_interopNamespaceDefault(fs);
 var dotenv__namespace = /*#__PURE__*/_interopNamespaceDefault(dotenv);
+var fs__namespace = /*#__PURE__*/_interopNamespaceDefault(fs);
 var os__namespace = /*#__PURE__*/_interopNamespaceDefault(os);
 var crypto__namespace = /*#__PURE__*/_interopNamespaceDefault(crypto);
 var zlib__namespace = /*#__PURE__*/_interopNamespaceDefault(zlib);
@@ -65,323 +65,6 @@ const RESOURCE_METADATA = {
         mimeType: 'text/markdown',
     },
 };
-
-function loadEnvFile(workingDirectory) {
-    const envPath = path__namespace.join(workingDirectory, '.env');
-    if (!fs__namespace.existsSync(envPath)) {
-        return {};
-    }
-    try {
-        const content = fs__namespace.readFileSync(envPath, 'utf-8');
-        const lines = content.split('\n');
-        let apiKey;
-        let serverUrl;
-        for (const line of lines) {
-            const trimmed = line.trim();
-            // Skip empty lines and comments
-            if (!trimmed || trimmed.startsWith('#')) {
-                continue;
-            }
-            // Parse KEY=VALUE
-            const match = trimmed.match(/^([^=]+)=(.*)$/);
-            if (!match)
-                continue;
-            const key = match[1].trim();
-            let value = match[2].trim();
-            // Remove quotes if present
-            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-                value = value.slice(1, -1);
-            }
-            if (key === 'APPLITOOLS_API_KEY' && value) {
-                apiKey = value;
-            }
-            else if (key === 'APPLITOOLS_SERVER_URL' && value) {
-                serverUrl = value;
-            }
-        }
-        if (apiKey) {
-            return { apiKey, serverUrl, foundIn: '.env' };
-        }
-    }
-    catch {
-        // Silently ignore errors reading .env
-    }
-    return {};
-}
-/**
- * Helper to resolve environment variable references in config files
- * Checks if the content references an env var, then resolves from process.env or .env file
- */
-function resolveEnvVarFromContent(content, envVarName, workingDirectory) {
-    // Check if content references the environment variable (with or without process.env prefix)
-    const patterns = [
-        new RegExp(`process\\.env\\.${envVarName}`, 'i'),
-        new RegExp(`${envVarName}(?!['"])`, 'i'), // Bare reference (not in quotes)
-    ];
-    const hasReference = patterns.some(pattern => pattern.test(content));
-    if (!hasReference) {
-        return undefined;
-    }
-    // Try to resolve the value: first from process.env, then from .env file
-    const envValue = process.env[envVarName];
-    if (envValue) {
-        return envValue;
-    }
-    // Fallback to .env file
-    const envResult = loadEnvFile(workingDirectory);
-    if (envVarName === 'APPLITOOLS_API_KEY') {
-        return envResult.apiKey;
-    }
-    else if (envVarName === 'APPLITOOLS_SERVER_URL') {
-        return envResult.serverUrl;
-    }
-    return undefined;
-}
-function loadConfigFile(configPath, fileName, workingDirectory) {
-    if (!fs__namespace.existsSync(configPath)) {
-        return {};
-    }
-    try {
-        const content = fs__namespace.readFileSync(configPath, 'utf-8');
-        // Search for apiKey and serverUrl in the file content
-        let apiKey;
-        let serverUrl;
-        // Pattern 1: apiKey: 'value' or apiKey: "value" (hardcoded values)
-        const apiKeyMatch = content.match(/apiKey\s*:\s*['"]([^'"]+)['"]/i);
-        if (apiKeyMatch) {
-            apiKey = apiKeyMatch[1];
-        }
-        // Pattern 2: serverUrl: 'value' or serverUrl: "value" (hardcoded values)
-        const serverUrlMatch = content.match(/serverUrl\s*:\s*['"]([^'"]+)['"]/i);
-        if (serverUrlMatch) {
-            serverUrl = serverUrlMatch[1];
-        }
-        // Pattern 3: Resolve environment variable references in config file
-        if (!apiKey) {
-            apiKey = resolveEnvVarFromContent(content, 'APPLITOOLS_API_KEY', workingDirectory);
-        }
-        if (!serverUrl) {
-            serverUrl = resolveEnvVarFromContent(content, 'APPLITOOLS_SERVER_URL', workingDirectory);
-        }
-        if (apiKey) {
-            return { apiKey, serverUrl, foundIn: fileName };
-        }
-    }
-    catch {
-        // Silently ignore errors reading config file
-    }
-    return {};
-}
-function findApiKey(workingDirectory = process.cwd()) {
-    // Define config file patterns to check (in priority order)
-    const configFiles = [
-        // Applitools config files
-        { name: 'applitools.config.js', path: path__namespace.join(workingDirectory, 'applitools.config.js') },
-        { name: 'applitools.config.cjs', path: path__namespace.join(workingDirectory, 'applitools.config.cjs') },
-        { name: 'applitools.config.mjs', path: path__namespace.join(workingDirectory, 'applitools.config.mjs') },
-        { name: 'applitools.config.ts', path: path__namespace.join(workingDirectory, 'applitools.config.ts') },
-        // Playwright config files
-        { name: 'playwright.config.js', path: path__namespace.join(workingDirectory, 'playwright.config.js') },
-        { name: 'playwright.config.cjs', path: path__namespace.join(workingDirectory, 'playwright.config.cjs') },
-        { name: 'playwright.config.mjs', path: path__namespace.join(workingDirectory, 'playwright.config.mjs') },
-        { name: 'playwright.config.ts', path: path__namespace.join(workingDirectory, 'playwright.config.ts') },
-    ];
-    // 1. Check each config file in order (config files have priority over .env)
-    for (const config of configFiles) {
-        const result = loadConfigFile(config.path, config.name, workingDirectory);
-        if (result.apiKey) {
-            return result;
-        }
-    }
-    // 2. Check .env file as fallback
-    const envResult = loadEnvFile(workingDirectory);
-    if (envResult.apiKey) {
-        return envResult;
-    }
-    // 3. Check environment variables as final fallback
-    const envApiKey = process.env.APPLITOOLS_API_KEY;
-    const envServerUrl = process.env.APPLITOOLS_SERVER_URL;
-    if (envApiKey) {
-        return {
-            apiKey: envApiKey,
-            serverUrl: envServerUrl,
-            foundIn: 'environment variable',
-        };
-    }
-    // Not found
-    return {};
-}
-
-let currentClientInfo = undefined;
-let currentCredentials = undefined;
-let ide = undefined;
-function setClientInfo(clientInfo) {
-    currentClientInfo = clientInfo;
-}
-function getClientInfo() {
-    return currentClientInfo;
-}
-function setCredentials(credentials) {
-    currentCredentials = credentials;
-}
-function getCredentials() {
-    return currentCredentials;
-}
-function setIDE(ideName) {
-    ide = ideName;
-}
-function getIDE() {
-    return ide;
-}
-function parseIDE(env, argv) {
-    var _a;
-    return env['ide'] || ((_a = argv.find(arg => arg.startsWith('--ide='))) === null || _a === void 0 ? void 0 : _a.split('=')[1]) || 'unknown';
-}
-/** Evaluated once at process start; off unless `EXPERIMENTAL_ENV` is `1`/`true` (any case). */
-function parseExperimental(env) {
-    var _a;
-    return ['1', 'true'].includes(((_a = env[EXPERIMENTAL_ENV]) !== null && _a !== void 0 ? _a : '').toLowerCase());
-}
-
-/** Load credentials from server context, config files, or environment variables */
-function loadCredentials(workingDirectory) {
-    const storedCredentials = getCredentials();
-    if ((storedCredentials === null || storedCredentials === void 0 ? void 0 : storedCredentials.apiKey) && (storedCredentials === null || storedCredentials === void 0 ? void 0 : storedCredentials.serverUrl)) {
-        return {
-            apiKey: storedCredentials.apiKey,
-            serverUrl: storedCredentials.serverUrl,
-            source: 'server-context',
-        };
-    }
-    const workingDir = workingDirectory || process.cwd();
-    const configResult = findApiKey(workingDir);
-    const apiKey = configResult.apiKey;
-    const serverUrl = configResult.serverUrl || DEFAULT_SERVER_URL;
-    const source = configResult.foundIn;
-    return { apiKey, serverUrl, source };
-}
-/** Load and store credentials in server context */
-function loadAndStoreCredentials(workingDirectory) {
-    const result = loadCredentials(workingDirectory);
-    if (result.apiKey && result.serverUrl) {
-        setCredentials({
-            apiKey: result.apiKey,
-            serverUrl: result.serverUrl,
-        });
-        return true;
-    }
-    return false;
-}
-/** Get credentials for external logging */
-function getCredentialsForLogging() {
-    const result = loadCredentials();
-    return {
-        apiKey: result.apiKey,
-        serverUrl: result.serverUrl || DEFAULT_SERVER_URL,
-    };
-}
-
-const handler = (() => {
-    if (process.env.APPLITOOLS_LOG_FILE) {
-        return logger$1.makeFileHandler({ filename: process.env.APPLITOOLS_LOG_FILE });
-    }
-    else if (process.env.APPLITOOLS_LOG_DIR) {
-        return logger$1.makeRollingFileHandler({ dirname: process.env.APPLITOOLS_LOG_DIR });
-    }
-    // Default to stderr to avoid interfering with MCP stdio protocol
-    return {
-        // eslint-disable-next-line no-console
-        log: (message) => console.error(message),
-        // eslint-disable-next-line no-console
-        warn: (message) => console.warn(message),
-        // eslint-disable-next-line no-console
-        error: (message) => console.error(message),
-    };
-})();
-// Only perform expensive serialisation when a log sink is explicitly configured.
-const isVerboseLogging = !!(process.env.APPLITOOLS_LOG_FILE ||
-    process.env.APPLITOOLS_LOG_DIR ||
-    process.env.APPLITOOLS_SHOW_LOGS);
-const logger = logger$1.makeLogger({ level: 'all', handler });
-const externalLogger = coreBase.makeCore({
-    agentId: 'mcp-tool-handler',
-    maskLog: false,
-    logger,
-    offlineLocationPath: undefined,
-});
-function log$2(level, ...args) {
-    logger[level](level, ...args);
-}
-async function externalLog(eventName, data, level = 'Notice') {
-    // Get credentials using centralized loader
-    const { apiKey, serverUrl: eyesServerUrl } = getCredentialsForLogging();
-    if (!apiKey || apiKey === '') {
-        logger.warn(`Cannot log external event ${eventName} - no API key configured`);
-        return;
-    }
-    try {
-        await externalLogger.logEvent({
-            settings: {
-                apiKey,
-                eyesServerUrl,
-                level,
-                event: {
-                    type: eventName,
-                    data: data || {},
-                },
-            },
-            logger,
-        });
-    }
-    catch (error) {
-        logger.error(`Failed to log external event ${eventName}:`, error);
-    }
-}
-
-/**
- * Documentation Resource
- *
- * Exposes the comprehensive README documentation for the Applitools MCP server
- */
-/**
- * Read documentation resource content
- */
-async function readDocumentationResource(uri) {
-    // Validate URI first (don't log validation errors)
-    if (uri !== RESOURCE_URIS.DOCUMENTATION_README) {
-        throw new Error(`Unknown resource URI: ${uri}`);
-    }
-    try {
-        // Determine the correct path based on whether we're running from source or dist
-        // In production: dist/resources/documentation/index.js -> dist/docs/README.md
-        // In tests: src/resources/documentation/index.ts -> docs/README.md
-        let docsPath;
-        if (/[\\/]dist(?:[\\/]|$)/.test(__dirname)) {
-            // Running from compiled dist (standalone or VS Code extension)
-            // Expect docs folder to be sibling of the script
-            docsPath = path.join(__dirname, 'docs/README.md');
-        }
-        else {
-            // Running from source (tests)
-            docsPath = path.join(__dirname, '../../../docs/README.md');
-        }
-        const content = await promises.readFile(docsPath, 'utf-8');
-        return {
-            contents: [
-                {
-                    uri,
-                    text: content,
-                    mimeType: 'text/markdown',
-                },
-            ],
-        };
-    }
-    catch (error) {
-        // Only log unexpected errors (file system errors, not validation errors)
-        log$2('error', '[Resources] Failed to read documentation:', error);
-        throw new Error(`Failed to read documentation: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
 
 /**
  * Wraps already-resolved key strings. A getter throws a clear error if its key wasn't supplied —
@@ -412,18 +95,32 @@ class StaticApiKeyProvider {
 
 const defaultLoadEnvDeps = {
     existsSync: fs__namespace.existsSync,
-    configDotenv: dotenv__namespace.config,
+    configDotenv: ({ path }) => {
+        try {
+            return { parsed: dotenv__namespace.parse(fs__namespace.readFileSync(path)) };
+        }
+        catch {
+            return {};
+        }
+    },
 };
+/** The variables `loadEnvFromCwd` reads from a `.env`: the keys and the server URL the Eyes tools use. */
+const WORKSPACE_ENV_NAMES = [
+    'APPLITOOLS_API_KEY',
+    'APPLITOOLS_READ_KEY',
+    'APPLITOOLS_WRITE_KEY',
+    'APPLITOOLS_SERVER_URL',
+];
+/** The nearest `.env` up from `startDir` that defines any of `WORKSPACE_ENV_NAMES`; never writes `process.env`. */
 function loadEnvFromCwd(startDir = process.cwd(), deps = defaultLoadEnvDeps) {
     let dir = startDir;
     while (true) {
         const envPath = path__namespace.join(dir, '.env');
         if (deps.existsSync(envPath)) {
-            const preset = new Set(Object.keys(process.env));
             const result = deps.configDotenv({ path: envPath });
-            const parsed = result?.parsed ?? {};
-            const applied = Object.keys(parsed).filter(name => !preset.has(name));
-            return { path: envPath, applied, parsed };
+            const parsed = Object.fromEntries(WORKSPACE_ENV_NAMES.flatMap(name => (result?.parsed?.[name] ? [[name, result.parsed[name]]] : [])));
+            if (Object.keys(parsed).length)
+                return { path: envPath, parsed };
         }
         const parent = path__namespace.dirname(dir);
         if (parent === dir)
@@ -661,7 +358,7 @@ function getLogFilePath(scopeId, deps = defaultPhaseTrackerDeps) {
  * lock-retry backoff (`withRetry`) as every other record this module writes, so a caller never
  * has to poll for the file to become available itself; a momentarily-busy append just retries.
  */
-function log$1(scopeId, label, fields = {}, deps = defaultPhaseTrackerDeps) {
+function log$2(scopeId, label, fields = {}, deps = defaultPhaseTrackerDeps) {
     const entry = { at: new Date().toISOString(), label, ...fields };
     withRetry(() => deps.mkdir(debugLogDir(deps)), deps);
     withRetry(() => deps.appendFile(getLogFilePath(scopeId, deps), `${JSON.stringify(entry)}\n`), deps);
@@ -3299,6 +2996,36 @@ function parseBatchUrl(url) {
     return { ...parsed, sessionId: null };
 }
 
+/** The only domains an API key is ever sent to: a request host must be one of them or a subdomain of one. */
+const SAFE_DOMAINS = ['applitools.com'];
+// The first rule `url` breaks, worded for the user and naming at most the hostname; undefined when it may receive a key.
+function refusalReason(url) {
+    let parsed;
+    try {
+        parsed = new URL(url);
+    }
+    catch {
+        return 'the URL could not be parsed';
+    }
+    const { hostname, protocol, username, password } = parsed;
+    if (!SAFE_DOMAINS.some(domain => hostname === domain || hostname.endsWith(`.${domain}`))) {
+        return `${hostname || 'the URL'} is not an Applitools host`;
+    }
+    if (protocol !== 'https:')
+        return `${hostname} is addressed over ${protocol.slice(0, -1)}, and keys are sent over https only`;
+    if (username || password)
+        return `the URL for ${hostname} contains a user name or password, which keys are never sent with`;
+    return undefined;
+}
+function isTrustedEyesUrl(url) {
+    return refusalReason(url) === undefined;
+}
+function assertTrustedEyesUrl(url) {
+    const reason = refusalReason(url);
+    if (reason)
+        throw new Error(`${reason}, so the request was not sent`);
+}
+
 // Same convention as core-base's reqEyes: `expected` is enforced by an afterResponse hook, so
 // call sites branch only on the statuses that carry meaning for them.
 function handleUnexpectedResponse() {
@@ -3338,9 +3065,38 @@ function isolateRetryPerRequest() {
         },
     };
 }
+// Kept last on every request: req appends per-call hooks after the instance's, and any earlier
+// beforeRequest may still return a request with a different URL.
+function guardDestination() {
+    const guard = {
+        afterOptionsMerged({ options }) {
+            const hooks = [].concat(options.hooks ?? []);
+            return { ...options, hooks: [...hooks.filter(hook => hook !== guard), guard] };
+        },
+        beforeRequest({ request }) {
+            assertTrustedEyesUrl(request.url);
+            // node-fetch forwards custom headers, the key's included, across a cross-origin redirect.
+            return { request, redirect: 'error' };
+        },
+    };
+    return guard;
+}
+/** Paths whose endpoint accepts the key only as the `apiKey` query parameter; every other request carries it as a header only. */
+const QUERY_AUTH_PATHS = [];
+/** The task-status endpoint answers without a key, so a request to it carries none. */
+const KEYLESS_PATH = /^\/api\/tasks\/[^/]+\/status$/;
+// Older api modules bake `apiKey=` into the URLs they pass in, so the parameter is settled here per path.
+function withQueryAuth(input, serverUrl, apiKey) {
+    const url = new URL(String(input), serverUrl.endsWith('/') ? serverUrl : `${serverUrl}/`);
+    if (QUERY_AUTH_PATHS.some(path => path.test(url.pathname)))
+        url.searchParams.set('apiKey', apiKey);
+    else
+        url.searchParams.delete('apiKey');
+    return url;
+}
 /**
  * Builds a configured `req` — core-base's `makeReqEyes` concept adapted to this package: the
- * instance owns the server URL, the `apiKey` query parameter, the transient-retry policy, and the
+ * instance owns the server URL, the API key, the transient-retry policy, and the
  * `expected`-status convention above, so api functions take the configured req plus business
  * parameters and never thread baseUrl/apiKey/transport themselves. Flat options on purpose: an api
  * function's own deps spread straight in — `makeReqResults({serverUrl, apiKey, ...deps})`.
@@ -3355,9 +3111,11 @@ function isolateRetryPerRequest() {
  * calls through a single instance and pins both properties.
  */
 function makeReqResults({ serverUrl, apiKey, fetch, logger }) {
-    return req.makeReq({
+    const req$1 = req.makeReq({
         baseUrl: serverUrl,
-        query: { apiKey },
+        headers: { 'X-Eyes-Api-Key': apiKey },
+        // req's HTTP/2 path rebuilds the request without its `redirect` mode.
+        httpVersion: 1,
         retry: {
             limit: 5,
             timeout: [200, 400, 800, 1600, 3200],
@@ -3370,10 +3128,19 @@ function makeReqResults({ serverUrl, apiKey, fetch, logger }) {
         // needs its own timeout to not hang forever.
         requestTimeout: 30000,
         connectionTimeout: 300000,
-        hooks: [isolateRetryPerRequest(), handleUnexpectedResponse()],
+        hooks: [isolateRetryPerRequest(), handleUnexpectedResponse(), guardDestination()],
         fetch,
         logger,
     });
+    return (input, options) => {
+        if (typeof input !== 'string' && !(input instanceof URL))
+            return req$1(input, options);
+        const url = withQueryAuth(input, serverUrl, apiKey);
+        if (!KEYLESS_PATH.test(url.pathname))
+            return req$1(url, options);
+        // An empty value overrides the instance's key header, and req drops empty-valued headers.
+        return req$1(url, { ...options, headers: { ...options?.headers, 'X-Eyes-Api-Key': '' } });
+    };
 }
 
 /**
@@ -4123,6 +3890,327 @@ async function fetchRawDiffs(rawSession, stepIndex, baseUrl, accountId, keys, de
     return rects;
 }
 
+function loadEnvFile(workingDirectory) {
+    const envPath = path__namespace.join(workingDirectory, '.env');
+    if (!fs__namespace.existsSync(envPath)) {
+        return {};
+    }
+    try {
+        const content = fs__namespace.readFileSync(envPath, 'utf-8');
+        const lines = content.split('\n');
+        let apiKey;
+        let serverUrl;
+        for (const line of lines) {
+            const trimmed = line.trim();
+            // Skip empty lines and comments
+            if (!trimmed || trimmed.startsWith('#')) {
+                continue;
+            }
+            // Parse KEY=VALUE
+            const match = trimmed.match(/^([^=]+)=(.*)$/);
+            if (!match)
+                continue;
+            const key = match[1].trim();
+            let value = match[2].trim();
+            // Remove quotes if present
+            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+                value = value.slice(1, -1);
+            }
+            if (key === 'APPLITOOLS_API_KEY' && value) {
+                apiKey = value;
+            }
+            else if (key === 'APPLITOOLS_SERVER_URL' && value) {
+                serverUrl = value;
+            }
+        }
+        if (apiKey) {
+            return { apiKey, serverUrl, foundIn: '.env' };
+        }
+    }
+    catch {
+        // Silently ignore errors reading .env
+    }
+    return {};
+}
+/**
+ * Helper to resolve environment variable references in config files
+ * Checks if the content references an env var, then resolves from process.env or .env file
+ */
+function resolveEnvVarFromContent(content, envVarName, workingDirectory) {
+    // Check if content references the environment variable (with or without process.env prefix)
+    const patterns = [
+        new RegExp(`process\\.env\\.${envVarName}`, 'i'),
+        new RegExp(`${envVarName}(?!['"])`, 'i'), // Bare reference (not in quotes)
+    ];
+    const hasReference = patterns.some(pattern => pattern.test(content));
+    if (!hasReference) {
+        return undefined;
+    }
+    // Try to resolve the value: first from process.env, then from .env file
+    const envValue = process.env[envVarName];
+    if (envValue) {
+        return envValue;
+    }
+    // Fallback to .env file
+    const envResult = loadEnvFile(workingDirectory);
+    if (envVarName === 'APPLITOOLS_API_KEY') {
+        return envResult.apiKey;
+    }
+    else if (envVarName === 'APPLITOOLS_SERVER_URL') {
+        return envResult.serverUrl;
+    }
+    return undefined;
+}
+function loadConfigFile(configPath, fileName, workingDirectory) {
+    if (!fs__namespace.existsSync(configPath)) {
+        return {};
+    }
+    try {
+        const content = fs__namespace.readFileSync(configPath, 'utf-8');
+        // Search for apiKey and serverUrl in the file content
+        let apiKey;
+        let serverUrl;
+        // Pattern 1: apiKey: 'value' or apiKey: "value" (hardcoded values)
+        const apiKeyMatch = content.match(/apiKey\s*:\s*['"]([^'"]+)['"]/i);
+        if (apiKeyMatch) {
+            apiKey = apiKeyMatch[1];
+        }
+        // Pattern 2: serverUrl: 'value' or serverUrl: "value" (hardcoded values)
+        const serverUrlMatch = content.match(/serverUrl\s*:\s*['"]([^'"]+)['"]/i);
+        if (serverUrlMatch) {
+            serverUrl = serverUrlMatch[1];
+        }
+        // Pattern 3: Resolve environment variable references in config file
+        if (!apiKey) {
+            apiKey = resolveEnvVarFromContent(content, 'APPLITOOLS_API_KEY', workingDirectory);
+        }
+        if (!serverUrl) {
+            serverUrl = resolveEnvVarFromContent(content, 'APPLITOOLS_SERVER_URL', workingDirectory);
+        }
+        if (apiKey) {
+            return { apiKey, serverUrl, foundIn: fileName };
+        }
+    }
+    catch {
+        // Silently ignore errors reading config file
+    }
+    return {};
+}
+function findApiKey(workingDirectory = process.cwd()) {
+    // Define config file patterns to check (in priority order)
+    const configFiles = [
+        // Applitools config files
+        { name: 'applitools.config.js', path: path__namespace.join(workingDirectory, 'applitools.config.js') },
+        { name: 'applitools.config.cjs', path: path__namespace.join(workingDirectory, 'applitools.config.cjs') },
+        { name: 'applitools.config.mjs', path: path__namespace.join(workingDirectory, 'applitools.config.mjs') },
+        { name: 'applitools.config.ts', path: path__namespace.join(workingDirectory, 'applitools.config.ts') },
+        // Playwright config files
+        { name: 'playwright.config.js', path: path__namespace.join(workingDirectory, 'playwright.config.js') },
+        { name: 'playwright.config.cjs', path: path__namespace.join(workingDirectory, 'playwright.config.cjs') },
+        { name: 'playwright.config.mjs', path: path__namespace.join(workingDirectory, 'playwright.config.mjs') },
+        { name: 'playwright.config.ts', path: path__namespace.join(workingDirectory, 'playwright.config.ts') },
+    ];
+    // 1. Check each config file in order (config files have priority over .env)
+    for (const config of configFiles) {
+        const result = loadConfigFile(config.path, config.name, workingDirectory);
+        if (result.apiKey) {
+            return result;
+        }
+    }
+    // 2. Check .env file as fallback
+    const envResult = loadEnvFile(workingDirectory);
+    if (envResult.apiKey) {
+        return envResult;
+    }
+    // 3. Check environment variables as final fallback
+    const envApiKey = process.env.APPLITOOLS_API_KEY;
+    const envServerUrl = process.env.APPLITOOLS_SERVER_URL;
+    if (envApiKey) {
+        return {
+            apiKey: envApiKey,
+            serverUrl: envServerUrl,
+            foundIn: 'environment variable',
+        };
+    }
+    // Not found
+    return {};
+}
+
+let currentClientInfo = undefined;
+let currentCredentials = undefined;
+let ide = undefined;
+function setClientInfo(clientInfo) {
+    currentClientInfo = clientInfo;
+}
+function getClientInfo() {
+    return currentClientInfo;
+}
+function setCredentials(credentials) {
+    currentCredentials = credentials;
+}
+function getCredentials() {
+    return currentCredentials;
+}
+function setIDE(ideName) {
+    ide = ideName;
+}
+function getIDE() {
+    return ide;
+}
+function parseIDE(env, argv) {
+    var _a;
+    return env['ide'] || ((_a = argv.find(arg => arg.startsWith('--ide='))) === null || _a === void 0 ? void 0 : _a.split('=')[1]) || 'unknown';
+}
+/** Evaluated once at process start; off unless `EXPERIMENTAL_ENV` is `1`/`true` (any case). */
+function parseExperimental(env) {
+    var _a;
+    return ['1', 'true'].includes(((_a = env[EXPERIMENTAL_ENV]) !== null && _a !== void 0 ? _a : '').toLowerCase());
+}
+
+/** Load credentials from server context, config files, or environment variables */
+function loadCredentials(workingDirectory) {
+    const storedCredentials = getCredentials();
+    if ((storedCredentials === null || storedCredentials === void 0 ? void 0 : storedCredentials.apiKey) && (storedCredentials === null || storedCredentials === void 0 ? void 0 : storedCredentials.serverUrl)) {
+        return {
+            apiKey: storedCredentials.apiKey,
+            serverUrl: storedCredentials.serverUrl,
+            source: 'server-context',
+        };
+    }
+    const workingDir = workingDirectory || process.cwd();
+    const configResult = findApiKey(workingDir);
+    const apiKey = configResult.apiKey;
+    const serverUrl = configResult.serverUrl || process.env.APPLITOOLS_SERVER_URL || DEFAULT_SERVER_URL;
+    const source = configResult.foundIn;
+    return { apiKey, serverUrl, source };
+}
+/** Load and store credentials in server context */
+function loadAndStoreCredentials(workingDirectory) {
+    const result = loadCredentials(workingDirectory);
+    if (result.apiKey && result.serverUrl) {
+        setCredentials({
+            apiKey: result.apiKey,
+            serverUrl: result.serverUrl,
+        });
+        return true;
+    }
+    return false;
+}
+/** Get credentials for external logging */
+function getCredentialsForLogging() {
+    const result = loadCredentials();
+    return {
+        apiKey: result.apiKey,
+        serverUrl: result.serverUrl || DEFAULT_SERVER_URL,
+    };
+}
+
+const handler = (() => {
+    if (process.env.APPLITOOLS_LOG_FILE) {
+        return logger$1.makeFileHandler({ filename: process.env.APPLITOOLS_LOG_FILE });
+    }
+    else if (process.env.APPLITOOLS_LOG_DIR) {
+        return logger$1.makeRollingFileHandler({ dirname: process.env.APPLITOOLS_LOG_DIR });
+    }
+    // Default to stderr to avoid interfering with MCP stdio protocol
+    return {
+        // eslint-disable-next-line no-console
+        log: (message) => console.error(message),
+        // eslint-disable-next-line no-console
+        warn: (message) => console.warn(message),
+        // eslint-disable-next-line no-console
+        error: (message) => console.error(message),
+    };
+})();
+// Only perform expensive serialisation when a log sink is explicitly configured.
+const isVerboseLogging = !!(process.env.APPLITOOLS_LOG_FILE ||
+    process.env.APPLITOOLS_LOG_DIR ||
+    process.env.APPLITOOLS_SHOW_LOGS);
+const logger = logger$1.makeLogger({ level: 'all', handler });
+const externalLogger = coreBase.makeCore({
+    agentId: 'mcp-tool-handler',
+    maskLog: false,
+    logger,
+    offlineLocationPath: undefined,
+});
+function log$1(level, ...args) {
+    logger[level](level, ...args);
+}
+async function externalLog(eventName, data, level = 'Notice') {
+    // Get credentials using centralized loader
+    const { apiKey, serverUrl: eyesServerUrl } = getCredentialsForLogging();
+    if (!apiKey || apiKey === '') {
+        logger.warn(`Cannot log external event ${eventName} - no API key configured`);
+        return;
+    }
+    if (!isTrustedEyesUrl(eyesServerUrl)) {
+        logger.warn(`Cannot log external event ${eventName} - the configured server is not an Applitools host`);
+        return;
+    }
+    try {
+        await externalLogger.logEvent({
+            settings: {
+                apiKey,
+                eyesServerUrl,
+                level,
+                event: {
+                    type: eventName,
+                    data: data || {},
+                },
+            },
+            logger,
+        });
+    }
+    catch (error) {
+        logger.error(`Failed to log external event ${eventName}:`, error);
+    }
+}
+
+/**
+ * Documentation Resource
+ *
+ * Exposes the comprehensive README documentation for the Applitools MCP server
+ */
+/**
+ * Read documentation resource content
+ */
+async function readDocumentationResource(uri) {
+    // Validate URI first (don't log validation errors)
+    if (uri !== RESOURCE_URIS.DOCUMENTATION_README) {
+        throw new Error(`Unknown resource URI: ${uri}`);
+    }
+    try {
+        // Determine the correct path based on whether we're running from source or dist
+        // In production: dist/resources/documentation/index.js -> dist/docs/README.md
+        // In tests: src/resources/documentation/index.ts -> docs/README.md
+        let docsPath;
+        if (/[\\/]dist(?:[\\/]|$)/.test(__dirname)) {
+            // Running from compiled dist (standalone or VS Code extension)
+            // Expect docs folder to be sibling of the script
+            docsPath = path.join(__dirname, 'docs/README.md');
+        }
+        else {
+            // Running from source (tests)
+            docsPath = path.join(__dirname, '../../../docs/README.md');
+        }
+        const content = await promises.readFile(docsPath, 'utf-8');
+        return {
+            contents: [
+                {
+                    uri,
+                    text: content,
+                    mimeType: 'text/markdown',
+                },
+            ],
+        };
+    }
+    catch (error) {
+        // Only log unexpected errors (file system errors, not validation errors)
+        log$1('error', '[Resources] Failed to read documentation:', error);
+        throw new Error(`Failed to read documentation: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
 const sessionMetadata = {
     validationCount: 0,
 };
@@ -4144,33 +4232,38 @@ function getLastValidatedServerUrl() {
     return sessionMetadata.lastValidatedServerUrl;
 }
 
-const API_KEY_VARS = ['APPLITOOLS_READ_KEY', 'APPLITOOLS_WRITE_KEY'];
 const loadEnvOnce = utils__namespace.general.cachify((startDir, source) => {
     const loaded = loadEnvFromCwd(startDir);
     if (loaded) {
-        const applied = loaded.applied.length ? `set ${loaded.applied.join(', ')}` : 'no new variables applied';
-        log$2('info', `[MCP Server] .env loaded from ${loaded.path} (${applied}; walked up from ${startDir}, triggered by ${source})`);
+        log$1('info', `[MCP Server] .env loaded from ${loaded.path} (defines ${Object.keys(loaded.parsed).join(', ')}; walked up from ${startDir}, triggered by ${source})`);
     }
     else {
-        log$2('debug', `[MCP Server] no .env found walking up from ${startDir} (triggered by ${source})`);
+        log$1('debug', `[MCP Server] no .env found walking up from ${startDir} (triggered by ${source})`);
     }
     return loaded;
 }, ([startDir]) => startDir, 30000);
+// Saved the first time a .env overrides a name, so the launch value comes back once no chosen .env defines it.
+const launchValues = new Map();
 function syncWorkspaceKeys(workspaceRoot, source) {
     const loaded = loadEnvOnce(workspaceRoot, source);
-    if (!loaded)
-        return;
-    for (const name of API_KEY_VARS) {
-        const value = loaded.parsed[name];
-        if (process.env[name] === value)
-            continue;
-        if (value) {
+    for (const name of WORKSPACE_ENV_NAMES) {
+        const value = loaded === null || loaded === void 0 ? void 0 : loaded.parsed[name];
+        if (loaded && value) {
+            if (!launchValues.has(name))
+                launchValues.set(name, process.env[name]);
+            if (process.env[name] === value)
+                continue;
             process.env[name] = value;
-            log$2('info', `[MCP Server] ${name} set from ${loaded.path} (triggered by ${source})`);
+            log$1('info', `[MCP Server] ${name} set from ${loaded.path} (triggered by ${source})`);
         }
-        else if (name in process.env) {
-            delete process.env[name];
-            log$2('info', `[MCP Server] ${name} removed — not in ${loaded.path} (triggered by ${source})`);
+        else if (launchValues.has(name)) {
+            const launchValue = launchValues.get(name);
+            launchValues.delete(name);
+            if (launchValue === undefined)
+                delete process.env[name];
+            else
+                process.env[name] = launchValue;
+            log$1('info', `[MCP Server] ${name} restored to its launch value (triggered by ${source})`);
         }
     }
 }
@@ -4499,8 +4592,8 @@ function gateRejectionCount() {
 
 var name = "@applitools/mcp";
 var mcpName = "io.github.applitools/applitools";
-var mcpRegistryVersion = "1.0.16";
-var version = "0.10.4";
+var mcpRegistryVersion = "1.0.17";
+var version = "0.10.5";
 var description = "Applitools MCP server for AI coding assistants";
 var main = "./dist/index.js";
 var bin = "./dist/index.js";
@@ -4732,7 +4825,7 @@ function jsonParams(essential, inputs) {
         if (biggest === undefined)
             return json;
         fields.delete(biggest);
-        log$2('warn', `[MCP] json_params over ${JSON_PARAMS_BUDGET} chars — dropped input "${biggest}"`);
+        log$1('warn', `[MCP] json_params over ${JSON_PARAMS_BUDGET} chars — dropped input "${biggest}"`);
         json = serialize();
     }
     return json;
@@ -4740,10 +4833,12 @@ function jsonParams(essential, inputs) {
 const createToolHandler = (toolDef, logic) => {
     return async (params) => {
         const clientInfo = getClientInfo();
-        log$2('info', `[MCP] 🟢 Tool Accessed: ${toolDef.name}`);
-        log$2('info', `[MCP] 📥 Client: ${(clientInfo === null || clientInfo === void 0 ? void 0 : clientInfo.name) || 'unknown'} v${(clientInfo === null || clientInfo === void 0 ? void 0 : clientInfo.version) || 'unknown'}`);
+        log$1('info', `[MCP] 🟢 Tool Accessed: ${toolDef.name}`);
+        log$1('info', `[MCP] 📥 Client: ${(clientInfo === null || clientInfo === void 0 ? void 0 : clientInfo.name) || 'unknown'} v${(clientInfo === null || clientInfo === void 0 ? void 0 : clientInfo.version) || 'unknown'}`);
+        if (typeof (params === null || params === void 0 ? void 0 : params.apiKey) === 'string')
+            logger.mask(params.apiKey);
         if (isVerboseLogging)
-            log$2('info', `[MCP] 📥 Params:`, JSON.stringify(params, null, 2));
+            log$1('info', `[MCP] 📥 Params:`, JSON.stringify(params, null, 2));
         const safeParams = params !== null && params !== void 0 ? params : {};
         const workspaceRoot = safeParams.workspaceRoot || getWorkspaceRoot() || process.cwd();
         syncWorkspaceKeys(workspaceRoot, toolDef.name);
@@ -4770,7 +4865,8 @@ const createToolHandler = (toolDef, logic) => {
             transport_mode: TRANSPORT_MODE,
             batch_id: batchId,
             session_id: sessionId,
-            params: JSON.stringify(params, null, 2).slice(0, 1024),
+            // The backend attributes every event to the authenticating key's account, so no key goes out here.
+            params: JSON.stringify({ ...params, apiKey: undefined }, null, 2).slice(0, 1024),
             json_params: jsonParams({}, callInputs),
             automation_framework: automationFramework,
             automation_framework_version: automationFrameworkVersion,
@@ -4782,7 +4878,7 @@ const createToolHandler = (toolDef, logic) => {
             const validatedParams = toolDef.input.parse(enrichedParams || {});
             const result = await withToolTelemetry(telemetry, () => logic(validatedParams));
             if (isVerboseLogging)
-                log$2('info', `[MCP] 📤 Result:`, serializeResultForLog(result));
+                log$1('info', `[MCP] 📤 Result:`, serializeResultForLog(result));
             const structuredContentWithoutMessage = { ...result.structuredContent };
             if (structuredContentWithoutMessage && 'message' in structuredContentWithoutMessage) {
                 delete structuredContentWithoutMessage.message;
@@ -4893,6 +4989,12 @@ const DEFAULT_RETRY_CONFIG = [
         timeout: [2000, 4000, 8000, 16000, 32000],
     },
 ];
+// node-fetch forwards the key header across a cross-origin redirect, and req's HTTP/2 path
+// rebuilds the request without its `redirect` mode.
+const NO_REDIRECTS = {
+    hooks: { beforeRequest: ({ request }) => ({ request, redirect: 'error' }) },
+    httpVersion: 1,
+};
 /**
  * API Client for Eyes server using @applitools/req for automatic retry handling
  */
@@ -4927,6 +5029,7 @@ class ApiClient {
             },
             requestTimeout: this.timeout,
             retry: this.retryConfig,
+            ...NO_REDIRECTS,
         });
         if (response.status === 401) {
             throw new InvalidApiKeyError(this.apiKey);
@@ -4949,9 +5052,10 @@ class ApiClient {
                 },
                 requestTimeout: this.timeout,
                 retry: this.retryConfig,
+                ...NO_REDIRECTS,
             });
-            // Handle authentication errors
-            if (response.status === 401) {
+            // Handle authentication errors; a 403 refuses the key too, which account-id-resolver remembers
+            if (response.status === 401 || response.status === 403) {
                 throw new InvalidApiKeyError(this.apiKey);
             }
             if (!response.ok) {
@@ -4978,16 +5082,16 @@ class ApiClient {
             const reqOptions = {
                 method: 'POST',
                 headers: {
+                    'X-Eyes-Api-Key': this.apiKey,
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                 },
                 body,
                 requestTimeout: this.timeout,
                 retry: this.retryConfig,
+                ...NO_REDIRECTS,
             };
-            // Add API key to query for POST requests (Eyes API pattern)
-            const url = `${this.baseUrl}/${endpoint}${endpoint.includes('?') ? '&' : '?'}apiKey=${this.apiKey}`;
-            const response = await req.req(url, reqOptions);
+            const response = await req.req(`${this.baseUrl}/${endpoint}`, reqOptions);
             // Handle authentication errors
             if (response.status === 401) {
                 throw new InvalidApiKeyError(this.apiKey);
@@ -5050,14 +5154,15 @@ const VERIFY_RETRY_CONFIG = [
  */
 async function verifyApiKeyWithServer(params) {
     const { apiKey, serverUrl } = params;
+    assertTrustedEyesUrl(serverUrl);
     const client = new ApiClient({
         baseUrl: serverUrl,
         apiKey: apiKey,
         timeout: 2000,
         retryConfig: VERIFY_RETRY_CONFIG,
     });
-    const response = await client.get(`api/auth/access?accessKey=${apiKey}`);
-    log$2('debug', `API key verification response: ${JSON.stringify(response)}`);
+    const response = await client.get('api/auth/access');
+    log$1('debug', `API key verification response: ${JSON.stringify(response)}`);
     if (response.accountId === '') {
         throw new Error('Invalid API key');
     }
@@ -5083,12 +5188,17 @@ const VerifyApiKeyInputSchema = zod.z.object({
         .optional()
         .describe('If true, save the validated API key and server URL as the default configuration in cache'),
 });
+// A key that fails validation is the one telemetry case where a key is reported, masked so that
+// a short value is never shown.
+function reportUnvalidatedKey(apiKey) {
+    recordToolTelemetry({ api_key_masked: apiKey.length <= 7 ? '***' : `${apiKey.slice(0, 3)}***${apiKey.slice(-3)}` });
+}
 /** Verify API key handler function */
 async function verifyApiKey(input = {}) {
     // Determine working directory
     const workingDirectory = input.workingDirectory || input.workspaceRoot || process.cwd();
-    log$2('debug', `Verifying Eyes API key in working directory: ${workingDirectory}`);
-    log$2('debug', `Input parameters: ${JSON.stringify(input)}`);
+    log$1('debug', `Verifying Eyes API key in working directory: ${workingDirectory}`);
+    log$1('debug', `Input parameters: ${JSON.stringify(input)}`);
     // Get API key - priority: input parameter > credential loader (server-context > config files > env vars)
     let apiKey = input.apiKey;
     let serverUrl = input.serverUrl;
@@ -5113,8 +5223,19 @@ async function verifyApiKey(input = {}) {
         new URL(finalServerUrl);
     }
     catch {
+        reportUnvalidatedKey(apiKey);
         return {
             message: wrapText('Eyes authentication failed. Invalid server URL format. Please verify that your server URL is correct.', 'suffix'),
+        };
+    }
+    try {
+        assertTrustedEyesUrl(finalServerUrl);
+    }
+    catch (error) {
+        reportUnvalidatedKey(apiKey);
+        return {
+            message: wrapText(`Eyes authentication failed: ${error.message}. ` +
+                'Correct the server URL where it is set: the serverUrl argument, APPLITOOLS_SERVER_URL or the project config file.', 'suffix'),
         };
     }
     // Call Eyes API to verify the key
@@ -5133,6 +5254,7 @@ async function verifyApiKey(input = {}) {
     }
     catch {
         // Return invalid for any error (401, network, etc.)
+        reportUnvalidatedKey(apiKey);
         return {
             message: wrapText('Eyes authentication failed. Please verify that your API Key or server URL is correct. Visit our documentation to learn how to retrieve these values: https://applitools.com/docs/eyes/playwright#set-your-applitools-api-key', 'suffix'),
         };
@@ -5272,7 +5394,8 @@ const PlaywrightJsSetupProjectClientInputSchema = createClientInputSchema(Playwr
 async function eyesSetupProject(input = {}) {
     const { workspaceRoot, warning } = validateCommonInput(input);
     let apiKey = getLastValidatedApiKey() || findApiKey(workspaceRoot).apiKey;
-    let eyesServerUrl = getLastValidatedServerUrl() || findApiKey(workspaceRoot).serverUrl;
+    const foundServerUrl = getLastValidatedServerUrl() || findApiKey(workspaceRoot).serverUrl;
+    let eyesServerUrl = foundServerUrl && isTrustedEyesUrl(foundServerUrl) ? foundServerUrl : undefined;
     const requiredApiKeyMessage = !apiKey
         ? 'IMPORTANT: An Applitools API key is required to run visual tests. Please provide your API key using the --apiKey argument when running npx eyes-setup, or set it in your environment variables or Playwright config file.'
         : '';
@@ -5858,20 +5981,30 @@ function instrumentedRegistrar(server) {
 const defaultResolverDeps = {
     verify: verifyApiKeyWithServer,
 };
-// No expiry: an accountId is a fixed property of the account behind the key, so a resolved entry
-// can never go stale. Holds the in-flight promise so a burst of URL builds shares one verification.
+// A resolved entry never expires: an accountId is a fixed property of the account behind the key.
+// Holds the in-flight promise so a burst of URL builds shares one verification.
 const accountIds = new Map();
+// A refusal can be temporary (a proxy's 403, permissions granted later), so it is retried after this long.
+const REFUSAL_TTL_MS = 5 * 60 * 1000;
+const refusalExpiry = new Map();
 function realAccountId(apiKey, serverUrl, deps) {
+    var _a, _b;
     // serverUrl joins the key because one API key against two servers is two accounts.
     const key = `${serverUrl}::${apiKey}`;
+    const now = (_a = deps.now) !== null && _a !== void 0 ? _a : (() => performance.now());
     const known = accountIds.get(key);
-    if (known)
+    if (known && ((_b = refusalExpiry.get(key)) !== null && _b !== void 0 ? _b : Infinity) > now())
         return known;
     const promise = deps.verify({ apiKey, serverUrl }).then(result => result.accountId);
     accountIds.set(key, promise);
-    // Failures are not remembered — a transient error must not poison the id for the whole process.
-    promise.catch(() => {
-        if (accountIds.get(key) === promise)
+    refusalExpiry.delete(key);
+    // A refused key is not sent again until the refusal expires; any other failure is retried next call.
+    promise.catch(error => {
+        if (accountIds.get(key) !== promise)
+            return;
+        if (error instanceof InvalidApiKeyError)
+            refusalExpiry.set(key, now() + REFUSAL_TTL_MS);
+        else
             accountIds.delete(key);
     });
     return promise;
@@ -5884,6 +6017,10 @@ function realAccountId(apiKey, serverUrl, deps) {
  * failure also returns the input unchanged.
  */
 async function getFullAccountId(accountId, apiKey, serverUrl = DEFAULT_SERVER_URL, deps = defaultResolverDeps) {
+    // Padded base64 always has a length divisible by 4 and stripped padding never leaves one, so an id
+    // of such a length is already complete and a lookup could not change it.
+    if (accountId && accountId.length % 4 === 0)
+        return accountId;
     try {
         const real = await realAccountId(apiKey, serverUrl, deps);
         if (accountId === undefined)
@@ -6743,6 +6880,7 @@ function textResult(text) {
  * variable name and the wording of the note that follows.
  */
 function resolveApiKey(spec, urlForAccountHint) {
+    assertTrustedEyesUrl(urlForAccountHint);
     const apiKey = process.env[spec.envVar];
     if (apiKey)
         return apiKey;
@@ -7921,7 +8059,7 @@ function registerEyesResolveTools(server, deps = defaultCommandsDeps) {
  * consolidates into that investigation's own single debug log rather than scattering per level.
  */
 function log(scopeId, label, fields = {}, deps) {
-    log$1(rootScopeId(scopeId), label, fields, deps);
+    log$2(rootScopeId(scopeId), label, fields, deps);
 }
 /** The exact path `log` above appends `scopeId`'s investigation's entries to — see `log`'s own doc comment for the root-normalization it applies first. */
 function debugLogPath(scopeId, deps) {
@@ -11410,7 +11548,7 @@ function registeredToolNames(experimental) {
 }
 
 async function startServer() {
-    loadEnvOnce(process.cwd(), 'server startup');
+    syncWorkspaceKeys(process.cwd(), 'server startup');
     const experimental = parseExperimental(process.env);
     const server = new mcp_js.McpServer({
         name: 'applitools-mcp',
@@ -11447,7 +11585,7 @@ async function startServer() {
         const clientInfo = server.server.getClientVersion();
         setClientInfo(clientInfo);
         setIDE(parseIDE(process.env, process.argv));
-        log$2('info', '[MCP Server] Client connected:', {
+        log$1('info', '[MCP Server] Client connected:', {
             name: (clientInfo === null || clientInfo === void 0 ? void 0 : clientInfo.name) || 'unknown',
             version: (clientInfo === null || clientInfo === void 0 ? void 0 : clientInfo.version) || 'unknown',
             description: clientInfo === null || clientInfo === void 0 ? void 0 : clientInfo.description,
@@ -11468,9 +11606,9 @@ async function startServer() {
                 .then(({ roots }) => {
                 const root = roots.find(r => r.uri.startsWith('file://'));
                 if (root)
-                    loadEnvOnce(node_url.fileURLToPath(root.uri), 'client roots');
+                    syncWorkspaceKeys(node_url.fileURLToPath(root.uri), 'client roots');
             })
-                .catch(error => log$2('debug', '[MCP Server] roots/list failed:', error));
+                .catch(error => log$1('debug', '[MCP Server] roots/list failed:', error));
         }
     };
     registerAllTools(server, experimental);
@@ -11484,28 +11622,28 @@ async function startServer() {
             return result;
         }
         catch (error) {
-            log$2('error', '[MCP Server] Resource documentation read failed:', error);
+            log$1('error', '[MCP Server] Resource documentation read failed:', error);
             throw error;
         }
     });
-    log$2('info', '[MCP Server] Registered resources: documentation');
+    log$1('info', '[MCP Server] Registered resources: documentation');
     const credentialsLoaded = loadAndStoreCredentials();
     if (credentialsLoaded) {
-        log$2('info', '[MCP Server] Credentials loaded from config/environment for stdio mode');
+        log$1('info', '[MCP Server] Credentials loaded from config/environment for stdio mode');
     }
     const transport = new stdio_js.StdioServerTransport();
     await server.connect(transport);
-    log$2('info', '[MCP Server] Applitools MCP Server started successfully (Stdio Mode)');
-    log$2('info', `[MCP Server] Experimental tools ${experimental ? 'enabled' : 'disabled'}`);
-    log$2('info', `[MCP Server] Available tools: ${registeredToolNames(experimental).join(', ')}`);
-    log$2('info', `[MCP Server] Available resources: documentation (${RESOURCE_URIS.DOCUMENTATION_README})`);
+    log$1('info', '[MCP Server] Applitools MCP Server started successfully (Stdio Mode)');
+    log$1('info', `[MCP Server] Experimental tools ${experimental ? 'enabled' : 'disabled'}`);
+    log$1('info', `[MCP Server] Available tools: ${registeredToolNames(experimental).join(', ')}`);
+    log$1('info', `[MCP Server] Available resources: documentation (${RESOURCE_URIS.DOCUMENTATION_README})`);
 }
 process.on('SIGINT', () => {
-    log$2('info', '[MCP Server] Received SIGINT, shutting down gracefully...');
+    log$1('info', '[MCP Server] Received SIGINT, shutting down gracefully...');
     process.exit(0);
 });
 process.on('SIGTERM', () => {
-    log$2('info', '[MCP Server] Received SIGTERM, shutting down gracefully...');
+    log$1('info', '[MCP Server] Received SIGTERM, shutting down gracefully...');
     process.exit(0);
 });
 const REJECTION_LOG_THROTTLE_MS = 1000;
@@ -11528,17 +11666,17 @@ function makeThrottledRejectionHandler(logFn, throttleMs = REJECTION_LOG_THROTTL
         }
     };
 }
-process.on('unhandledRejection', makeThrottledRejectionHandler((...args) => log$2('error', ...args)));
+process.on('unhandledRejection', makeThrottledRejectionHandler((...args) => log$1('error', ...args)));
 process.on('uncaughtException', error => {
     if (error.code === 'EPIPE') {
         process.stderr.write('[MCP Server] Client disconnected (EPIPE), shutting down gracefully...\n');
         process.exit(0);
     }
-    log$2('error', '[MCP Server] Uncaught Exception:', error);
+    log$1('error', '[MCP Server] Uncaught Exception:', error);
 });
 
 startServer().catch(error => {
-    log$2('error', '[MCP Server] Failed to start Applitools Eyes MCP server:', error);
+    log$1('error', '[MCP Server] Failed to start Applitools Eyes MCP server:', error);
     process.exit(1);
 });
 //# sourceMappingURL=index.js.map

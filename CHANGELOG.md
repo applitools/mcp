@@ -5,6 +5,34 @@ All notable changes to the Applitools Eyes MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.5](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.4...js/mcp@0.10.5) (2026-11-16)
+
+
+### Bug Fixes
+
+* send credentials only to trusted destinations | AD-17993 ([#4466](https://github.com/Applitools-Dev/sdk/issues/4466)) ([b348704](https://github.com/Applitools-Dev/sdk/commit/b348704fcf8ccf47bea882ef1406f4aa8c7ebda5))
+
+
+### Dependencies
+
+* @applitools/eyes-results bumped to 0.2.10
+  #### Bug Fixes
+
+  * send credentials only to trusted destinations | AD-17993 ([#4466](https://github.com/Applitools-Dev/sdk/issues/4466)) ([b348704](https://github.com/Applitools-Dev/sdk/commit/b348704fcf8ccf47bea882ef1406f4aa8c7ebda5))
+* @applitools/core-base bumped to 1.44.0
+  #### Features
+
+  * pretty-print eyes.run steps in the console and HTML report | AD-17526 ([#4375](https://github.com/Applitools-Dev/sdk/issues/4375)) ([76b07ba](https://github.com/Applitools-Dev/sdk/commit/76b07ba02253eaa409cab75d528ebcc315c612af))
+  * raise the pdf match page cap to 1000 | AD-18090 ([#4475](https://github.com/Applitools-Dev/sdk/issues/4475)) ([91be5fe](https://github.com/Applitools-Dev/sdk/commit/91be5fef541308cbf94964402948aa5b8d31078e))
+  * send a per-checkpoint idempotencyKey on match requests | AD-15258 ([#4473](https://github.com/Applitools-Dev/sdk/issues/4473)) ([b19f1bd](https://github.com/Applitools-Dev/sdk/commit/b19f1bd0282395dfa145e19c2b91aea27588ded6))
+
+
+  #### Bug Fixes
+
+  * deterministic offline close.json after matchAndEnd | AD-17470 ([#4474](https://github.com/Applitools-Dev/sdk/issues/4474)) ([23d469c](https://github.com/Applitools-Dev/sdk/commit/23d469c37f37bd5f667bf07abc4630308ca02af5))
+  * expose element selectors, populated instruction and failure reasons from eyes.run | AD-16272 AD-16546 AD-16609 ([#4264](https://github.com/Applitools-Dev/sdk/issues/4264)) ([a7720f3](https://github.com/Applitools-Dev/sdk/commit/a7720f321d18f0af48ab295a6142cde08439b074))
+  * user-facing messages for NLP service failures | AD-16828 ([#4392](https://github.com/Applitools-Dev/sdk/issues/4392)) ([9d24b19](https://github.com/Applitools-Dev/sdk/commit/9d24b19f9a3c667f3af1164fb541b84b076d62c1))
+
 ## [0.10.4](https://github.com/Applitools-Dev/sdk/compare/js/mcp@0.10.3...js/mcp@0.10.4) (2026-11-11)
 
 
