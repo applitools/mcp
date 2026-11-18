@@ -3924,7 +3924,7 @@ function loadEnvFile(workingDirectory) {
             }
         }
         if (apiKey) {
-            return { apiKey, serverUrl, foundIn: '.env' };
+            return { apiKey, serverUrl, foundIn: '.env', keyFrom: 'env_file' };
         }
     }
     catch {
@@ -3970,6 +3970,7 @@ function loadConfigFile(configPath, fileName, workingDirectory) {
         // Search for apiKey and serverUrl in the file content
         let apiKey;
         let serverUrl;
+        let keyFrom = 'config';
         // Pattern 1: apiKey: 'value' or apiKey: "value" (hardcoded values)
         const apiKeyMatch = content.match(/apiKey\s*:\s*['"]([^'"]+)['"]/i);
         if (apiKeyMatch) {
@@ -3983,12 +3984,14 @@ function loadConfigFile(configPath, fileName, workingDirectory) {
         // Pattern 3: Resolve environment variable references in config file
         if (!apiKey) {
             apiKey = resolveEnvVarFromContent(content, 'APPLITOOLS_API_KEY', workingDirectory);
+            // The same check resolveEnvVarFromContent makes before falling back to this directory's .env.
+            keyFrom = process.env.APPLITOOLS_API_KEY ? 'environment' : 'env_file';
         }
         if (!serverUrl) {
             serverUrl = resolveEnvVarFromContent(content, 'APPLITOOLS_SERVER_URL', workingDirectory);
         }
         if (apiKey) {
-            return { apiKey, serverUrl, foundIn: fileName };
+            return { apiKey, serverUrl, foundIn: fileName, keyFrom };
         }
     }
     catch {
@@ -4030,12 +4033,22 @@ function findApiKey(workingDirectory = process.cwd()) {
             apiKey: envApiKey,
             serverUrl: envServerUrl,
             foundIn: 'environment variable',
+            keyFrom: 'environment',
         };
     }
     // Not found
     return {};
 }
 
+// Saved the first time a .env overrides a workspace name, so the launch value comes back once no
+// chosen .env defines it. Kept here so credential loading can read it without importing env-loader.
+const workspaceLaunchValues = new Map();
+/** Whether a workspace name's current value is the chosen `.env`'s override, the launch value, or absent. */
+function workspaceValueSource(name) {
+    if (!process.env[name])
+        return 'unset';
+    return workspaceLaunchValues.has(name) ? 'env_file' : 'process_env';
+}
 let currentClientInfo = undefined;
 let currentCredentials = undefined;
 let ide = undefined;
@@ -4075,6 +4088,7 @@ function loadCredentials(workingDirectory) {
             apiKey: storedCredentials.apiKey,
             serverUrl: storedCredentials.serverUrl,
             source: 'server-context',
+            keySource: storedCredentials.keySource,
         };
     }
     const workingDir = workingDirectory || process.cwd();
@@ -4082,7 +4096,14 @@ function loadCredentials(workingDirectory) {
     const apiKey = configResult.apiKey;
     const serverUrl = configResult.serverUrl || process.env.APPLITOOLS_SERVER_URL || DEFAULT_SERVER_URL;
     const source = configResult.foundIn;
-    return { apiKey, serverUrl, source };
+    return { apiKey, serverUrl, source, keySource: apiKey ? keySourceOf(configResult) : undefined };
+}
+function keySourceOf({ keyFrom, foundIn }) {
+    if (keyFrom === 'environment')
+        return workspaceValueSource('APPLITOOLS_API_KEY');
+    if (keyFrom === 'env_file')
+        return 'env_file';
+    return (foundIn === null || foundIn === void 0 ? void 0 : foundIn.startsWith('playwright.config')) ? 'playwright_config' : 'applitools_config';
 }
 /** Load and store credentials in server context */
 function loadAndStoreCredentials(workingDirectory) {
@@ -4091,6 +4112,7 @@ function loadAndStoreCredentials(workingDirectory) {
         setCredentials({
             apiKey: result.apiKey,
             serverUrl: result.serverUrl,
+            keySource: result.keySource,
         });
         return true;
     }
@@ -4242,23 +4264,21 @@ const loadEnvOnce = utils__namespace.general.cachify((startDir, source) => {
     }
     return loaded;
 }, ([startDir]) => startDir, 30000);
-// Saved the first time a .env overrides a name, so the launch value comes back once no chosen .env defines it.
-const launchValues = new Map();
 function syncWorkspaceKeys(workspaceRoot, source) {
     const loaded = loadEnvOnce(workspaceRoot, source);
     for (const name of WORKSPACE_ENV_NAMES) {
         const value = loaded === null || loaded === void 0 ? void 0 : loaded.parsed[name];
         if (loaded && value) {
-            if (!launchValues.has(name))
-                launchValues.set(name, process.env[name]);
+            if (!workspaceLaunchValues.has(name))
+                workspaceLaunchValues.set(name, process.env[name]);
             if (process.env[name] === value)
                 continue;
             process.env[name] = value;
             log$1('info', `[MCP Server] ${name} set from ${loaded.path} (triggered by ${source})`);
         }
-        else if (launchValues.has(name)) {
-            const launchValue = launchValues.get(name);
-            launchValues.delete(name);
+        else if (workspaceLaunchValues.has(name)) {
+            const launchValue = workspaceLaunchValues.get(name);
+            workspaceLaunchValues.delete(name);
             if (launchValue === undefined)
                 delete process.env[name];
             else
@@ -4589,11 +4609,20 @@ function countGateRejection() {
 function gateRejectionCount() {
     return gateRejections;
 }
+/** Where each key setting in use came from, as fixed enum values only — never a path, file name or key. */
+function keySources() {
+    var _a;
+    return {
+        api_key_source: (_a = loadCredentials().keySource) !== null && _a !== void 0 ? _a : 'unset',
+        read_key_source: workspaceValueSource('APPLITOOLS_READ_KEY'),
+        write_key_source: workspaceValueSource('APPLITOOLS_WRITE_KEY'),
+    };
+}
 
 var name = "@applitools/mcp";
 var mcpName = "io.github.applitools/applitools";
-var mcpRegistryVersion = "1.0.17";
-var version = "0.10.5";
+var mcpRegistryVersion = "1.0.18";
+var version = "0.10.6";
 var description = "Applitools MCP server for AI coding assistants";
 var main = "./dist/index.js";
 var bin = "./dist/index.js";
@@ -4842,6 +4871,8 @@ const createToolHandler = (toolDef, logic) => {
         const safeParams = params !== null && params !== void 0 ? params : {};
         const workspaceRoot = safeParams.workspaceRoot || getWorkspaceRoot() || process.cwd();
         syncWorkspaceKeys(workspaceRoot, toolDef.name);
+        // Read before any await, while the process-wide key slot still holds this call's keys.
+        const sources = keySources();
         const { selected: frameworkSelected, detected: detectedFrameworks } = getAutomationFramework(workspaceRoot, safeParams.activeFile);
         const { name: automationFramework, version: automationFrameworkVersion } = frameworkSelected;
         const { selected: sdkLanguage, detected: detectedLanguages } = getSdkLanguage(workspaceRoot);
@@ -4853,7 +4884,7 @@ const createToolHandler = (toolDef, logic) => {
             sdkLanguage,
         };
         const { batchId, sessionId } = extractScopeIds(safeParams);
-        const telemetry = {};
+        const telemetry = { ...sources };
         const callInputs = reportedInputs(safeParams);
         const outcomeJsonParams = () => jsonParams({ ...telemetry, gate_rejections: gateRejectionCount() }, callInputs);
         externalLog('mcp_tool_invoked', {
@@ -4867,7 +4898,7 @@ const createToolHandler = (toolDef, logic) => {
             session_id: sessionId,
             // The backend attributes every event to the authenticating key's account, so no key goes out here.
             params: JSON.stringify({ ...params, apiKey: undefined }, null, 2).slice(0, 1024),
-            json_params: jsonParams({}, callInputs),
+            json_params: jsonParams(sources, callInputs),
             automation_framework: automationFramework,
             automation_framework_version: automationFrameworkVersion,
             sdk_language: sdkLanguage,
@@ -5189,9 +5220,12 @@ const VerifyApiKeyInputSchema = zod.z.object({
         .describe('If true, save the validated API key and server URL as the default configuration in cache'),
 });
 // A key that fails validation is the one telemetry case where a key is reported, masked so that
-// a short value is never shown.
-function reportUnvalidatedKey(apiKey) {
-    recordToolTelemetry({ api_key_masked: apiKey.length <= 7 ? '***' : `${apiKey.slice(0, 3)}***${apiKey.slice(-3)}` });
+// a short value is never shown; its source replaces the pinned key's so both fields describe it.
+function reportUnvalidatedKey(apiKey, keySource) {
+    recordToolTelemetry({
+        api_key_source: keySource,
+        api_key_masked: apiKey.length <= 7 ? '***' : `${apiKey.slice(0, 3)}***${apiKey.slice(-3)}`,
+    });
 }
 /** Verify API key handler function */
 async function verifyApiKey(input = {}) {
@@ -5203,12 +5237,14 @@ async function verifyApiKey(input = {}) {
     let apiKey = input.apiKey;
     let serverUrl = input.serverUrl;
     let foundIn;
+    let keySource = input.apiKey ? 'tool_argument' : undefined;
     // Load credentials if not provided as input
     if (!apiKey || !serverUrl) {
         const credentialResult = loadCredentials(workingDirectory);
         apiKey = apiKey || credentialResult.apiKey;
         serverUrl = serverUrl || credentialResult.serverUrl; // loadCredentials always provides serverUrl (with default)
         foundIn = credentialResult.source;
+        keySource !== null && keySource !== void 0 ? keySource : (keySource = credentialResult.keySource);
     }
     // Validate API key presence
     if (!apiKey || apiKey.trim() === '') {
@@ -5223,7 +5259,7 @@ async function verifyApiKey(input = {}) {
         new URL(finalServerUrl);
     }
     catch {
-        reportUnvalidatedKey(apiKey);
+        reportUnvalidatedKey(apiKey, keySource);
         return {
             message: wrapText('Eyes authentication failed. Invalid server URL format. Please verify that your server URL is correct.', 'suffix'),
         };
@@ -5232,7 +5268,7 @@ async function verifyApiKey(input = {}) {
         assertTrustedEyesUrl(finalServerUrl);
     }
     catch (error) {
-        reportUnvalidatedKey(apiKey);
+        reportUnvalidatedKey(apiKey, keySource);
         return {
             message: wrapText(`Eyes authentication failed: ${error.message}. ` +
                 'Correct the server URL where it is set: the serverUrl argument, APPLITOOLS_SERVER_URL or the project config file.', 'suffix'),
@@ -5244,7 +5280,9 @@ async function verifyApiKey(input = {}) {
         // Mark as validated in session memory
         markApiKeyAsValidated(apiKey, finalServerUrl);
         // Store credentials in server context for external logging
-        setCredentials({ apiKey, serverUrl: finalServerUrl });
+        setCredentials({ apiKey, serverUrl: finalServerUrl, keySource });
+        // This call's events were seeded before the key was pinned; report the pinned key's source instead.
+        recordToolTelemetry({ api_key_source: keySource });
         const successMessage = foundIn
             ? `Eyes authentication successful! API key found in ${foundIn}`
             : 'Eyes authentication successful!';
@@ -5254,7 +5292,7 @@ async function verifyApiKey(input = {}) {
     }
     catch {
         // Return invalid for any error (401, network, etc.)
-        reportUnvalidatedKey(apiKey);
+        reportUnvalidatedKey(apiKey, keySource);
         return {
             message: wrapText('Eyes authentication failed. Please verify that your API Key or server URL is correct. Visit our documentation to learn how to retrieve these values: https://applitools.com/docs/eyes/playwright#set-your-applitools-api-key', 'suffix'),
         };
